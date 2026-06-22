@@ -130,6 +130,9 @@ input:focus, textarea:focus, select:focus {
 }
 
 .sidebar {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
     background: var(--sidebar);
     color: #fff;
     padding: 20px 16px;
@@ -176,6 +179,33 @@ input:focus, textarea:focus, select:focus {
 
 .nav button:hover, .nav button.active {
     background: var(--sidebar-2);
+    color: #fff;
+}
+
+.sidebar-actions {
+    margin-top: auto;
+    padding-top: 18px;
+    border-top: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.sidebar-logout {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    width: 100%;
+    min-height: 42px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 7px;
+    padding: 9px 12px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #ffe4e6;
+    text-align: left;
+}
+
+.sidebar-logout:hover {
+    border-color: rgba(255, 255, 255, 0.32);
+    background: rgba(255, 255, 255, 0.14);
     color: #fff;
 }
 
@@ -388,6 +418,17 @@ svg {
     background: rgba(255, 255, 255, 0.08);
 }
 
+.btn.logout-inline {
+    border-color: #f0caca;
+    color: var(--danger);
+    background: #fff;
+}
+
+.btn.logout-inline:hover {
+    border-color: #e5a5a5;
+    background: #fff5f5;
+}
+
 .btn.full {
     width: 100%;
 }
@@ -562,6 +603,11 @@ code {
 
     .sidebar {
         position: static;
+        min-height: auto;
+    }
+
+    .sidebar-actions {
+        margin-top: 18px;
     }
 
     .topbar, .panel-head, .user-box {

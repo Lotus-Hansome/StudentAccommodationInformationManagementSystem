@@ -19,7 +19,7 @@ const titles = {
 
 document.addEventListener("DOMContentLoaded", () => {
   $("#loginForm").addEventListener("submit", login);
-  $("#logoutButton").addEventListener("click", logout);
+  $$("[data-logout]").forEach((button) => button.addEventListener("click", logout));
   $$(".nav button").forEach((button) => button.addEventListener("click", () => navigate(button.dataset.view)));
 
   $("#allStudentsButton").addEventListener("click", () => loadStudents("all"));
@@ -55,13 +55,24 @@ async function login(event) {
   toast("登录成功");
 }
 
-function logout() {
+async function logout() {
+  const token = state.token;
+  if (token) {
+    try {
+      await fetch("/api/logout", { method: "POST", headers: { "X-Auth-Token": token } });
+    } catch (error) {
+      console.warn("Logout request failed", error);
+    }
+  }
   state.token = "";
   state.role = "";
   state.username = "";
   state.studentId = "";
   $("#appShell").classList.add("hidden");
   $("#loginPage").classList.remove("hidden");
+  $("#currentRole").textContent = "";
+  $("#currentUser").textContent = "";
+  toast("已退出登录");
 }
 
 function applyRole() {

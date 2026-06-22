@@ -82,6 +82,10 @@ public class DormitoryWebServer {
             login(exchange);
             return;
         }
+        if ("/api/logout".equals(path) && "POST".equalsIgnoreCase(method)) {
+            logout(exchange);
+            return;
+        }
         if ("/api/overview".equals(path) && "GET".equalsIgnoreCase(method)) {
             requireUser(exchange);
             overview(exchange);
@@ -133,6 +137,14 @@ public class DormitoryWebServer {
                 + WebJson.property("role", user.get().getRole().name()) + ","
                 + WebJson.property("studentId", user.get().getStudentId())
                 + "}");
+    }
+
+    private void logout(HttpExchange exchange) throws IOException {
+        String token = exchange.getRequestHeaders().getFirst("X-Auth-Token");
+        if (token != null && !token.isBlank()) {
+            sessions.remove(token);
+        }
+        sendJson(exchange, 200, "{" + WebJson.booleanProperty("success", true) + "}");
     }
 
     private void overview(HttpExchange exchange) throws IOException {
