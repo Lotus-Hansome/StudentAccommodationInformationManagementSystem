@@ -271,7 +271,7 @@ async function loadModelConfig() {
   form.apiUrl.value = data.apiUrl || "";
   form.model.value = data.model || "";
   form.apiKey.value = "";
-  form.apiKey.placeholder = data.apiKeySet ? `已保存：${data.apiKeyMasked}，留空则保留` : "请输入 API Key";
+  form.apiKey.placeholder = "";
 
   const status = $("#modelConfigStatus");
   status.textContent = data.configured ? `已配置 · ${data.sourceText}` : "未配置";

@@ -218,29 +218,21 @@
                     <form id="modelConfigForm" class="form-grid">
                         <label>
                             <span>接口地址</span>
-                            <input name="apiUrl" placeholder="https://api.example.com/v1/chat/completions">
+                            <input name="apiUrl">
                         </label>
                         <label>
                             <span>模型名称</span>
-                            <input name="model" placeholder="例如 gpt-4o-mini 或兼容模型名">
+                            <input name="model">
                         </label>
                         <label>
                             <span>API Key</span>
-                            <input name="apiKey" type="password" placeholder="留空则保留原密钥">
+                            <input name="apiKey" type="password">
                         </label>
                         <div class="form-actions">
                             <button type="button" id="reloadModelConfigButton" class="btn">刷新状态</button>
                             <button class="btn primary" type="submit"><svg><use href="#icon-save"></use></svg>保存配置</button>
                         </div>
                     </form>
-                </section>
-                <section class="panel">
-                    <div class="panel-head"><h3>配置说明</h3></div>
-                    <div class="settings-note">
-                        <p>模型服务配置保存在服务器本机的 <code>config/model.properties</code>，该文件不会上传到 GitHub。</p>
-                        <p>页面不会回显 API Key 明文；保存时如果密钥留空，系统会保留原密钥。</p>
-                        <p>也可以继续使用部署环境变量配置模型服务，环境变量配置完整时优先使用环境变量。</p>
-                    </div>
                 </section>
             </div>
         </section>
