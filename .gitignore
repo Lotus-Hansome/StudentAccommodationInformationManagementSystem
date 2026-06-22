@@ -1,0 +1,5 @@
+out/
+build/
+lib/
+config/database.properties
+*.class
