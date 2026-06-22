@@ -172,6 +172,10 @@ public class DormitoryWebServer {
                 records = studentDormService.findByStudentId(query.getOrDefault("studentId", "")).map(List::of).orElseGet(List::of);
             } else if ("dorm".equals(mode)) {
                 records = studentDormService.findByDormNumber(query.getOrDefault("dormNumber", ""));
+            } else if ("departmentClass".equals(mode)) {
+                records = studentDormService.findByDepartmentAndClass(
+                        query.getOrDefault("department", ""),
+                        query.getOrDefault("className", ""));
             } else if ("sorted".equals(mode)) {
                 records = studentDormService.sortByDepartmentAndClass();
             } else {

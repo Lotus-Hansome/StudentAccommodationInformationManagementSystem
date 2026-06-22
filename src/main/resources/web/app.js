@@ -26,6 +26,7 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#sortStudentsButton").addEventListener("click", () => loadStudents("sorted"));
   $("#searchStudentButton").addEventListener("click", () => loadStudents("student", { studentId: $("#studentIdQuery").value.trim() }));
   $("#searchDormButton").addEventListener("click", () => loadStudents("dorm", { dormNumber: $("#dormQuery").value.trim() }));
+  $("#searchDepartmentClassButton").addEventListener("click", searchDepartmentClass);
   $("#studentForm").addEventListener("submit", saveStudent);
   $("#resetStudentForm").addEventListener("click", resetStudentForm);
 
@@ -128,6 +129,16 @@ async function loadStudents(mode, params = {}) {
   const data = await api(`/api/students?${query.toString()}`);
   state.students = data.students;
   renderStudents(data.students);
+}
+
+function searchDepartmentClass() {
+  const department = $("#departmentQuery").value.trim();
+  const className = $("#classQuery").value.trim();
+  if (!department && !className) {
+    toast("请输入所在系或班级");
+    return;
+  }
+  loadStudents("departmentClass", { department, className });
 }
 
 function renderStudents(students) {

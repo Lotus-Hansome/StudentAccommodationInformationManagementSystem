@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -81,6 +82,18 @@ public class StudentDormService {
         return records.stream()
                 .filter(record -> record.getDormNumber().equalsIgnoreCase(normalizedDormNumber))
                 .sorted(Comparator.comparing(StudentDormRecord::getBedNumber))
+                .collect(Collectors.toList());
+    }
+
+    public List<StudentDormRecord> findByDepartmentAndClass(String department, String className) {
+        String normalizedDepartment = normalizeText(department);
+        String normalizedClassName = normalizeText(className);
+        return records.stream()
+                .filter(record -> matchesText(record.getDepartment(), normalizedDepartment))
+                .filter(record -> matchesText(record.getClassName(), normalizedClassName))
+                .sorted(Comparator.comparing(StudentDormRecord::getDepartment)
+                        .thenComparing(StudentDormRecord::getClassName)
+                        .thenComparing(StudentDormRecord::getStudentId))
                 .collect(Collectors.toList());
     }
 
@@ -180,6 +193,15 @@ public class StudentDormService {
 
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private boolean matchesText(String actualValue, String queryValue) {
+        if (isBlank(queryValue)) {
+            return true;
+        }
+        String actual = normalizeText(actualValue).toLowerCase(Locale.ROOT);
+        String query = normalizeText(queryValue).toLowerCase(Locale.ROOT);
+        return actual.contains(query);
     }
 
     private void normalize(StudentDormRecord record) {
