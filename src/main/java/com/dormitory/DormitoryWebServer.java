@@ -6,6 +6,7 @@ import com.sun.net.httpserver.HttpServer;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.BindException;
 import java.net.InetSocketAddress;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
@@ -51,6 +52,9 @@ public class DormitoryWebServer {
             System.out.println("学生宿舍信息管理系统已启动：http://localhost:" + port);
             System.out.println("数据库：MySQL，账号默认 admin/admin123、student/student123");
         } catch (IOException e) {
+            if (e instanceof BindException) {
+                throw new IllegalStateException("端口 " + port + " 已被占用。请先停止旧服务，或设置 APP_PORT 使用其他端口。", e);
+            }
             throw new IllegalStateException("启动 Web 服务失败：" + e.getMessage(), e);
         }
     }
@@ -119,7 +123,8 @@ public class DormitoryWebServer {
                 + WebJson.booleanProperty("success", true) + ","
                 + WebJson.property("token", token) + ","
                 + WebJson.property("username", user.get().getUsername()) + ","
-                + WebJson.property("role", user.get().getRole().name())
+                + WebJson.property("role", user.get().getRole().name()) + ","
+                + WebJson.property("studentId", user.get().getStudentId())
                 + "}");
     }
 
@@ -193,13 +198,19 @@ public class DormitoryWebServer {
                 requireAdmin(exchange);
                 requests = changeRequestService.listPending();
             } else {
-                requests = changeRequestService.listByStudentId(query.getOrDefault("studentId", ""));
+                String studentId = user.getRole() == UserRole.ADMIN
+                        ? query.getOrDefault("studentId", "")
+                        : requireBoundStudent(user);
+                requests = changeRequestService.listByStudentId(studentId);
             }
             sendJson(exchange, 200, "{\"success\":true,\"requests\":" + requestsJson(requests) + "}");
             return;
         }
         if ("POST".equalsIgnoreCase(method)) {
             Map<String, String> form = readForm(exchange);
+            if (user.getRole() != UserRole.ADMIN) {
+                form.put("studentId", requireBoundStudent(user));
+            }
             DormChangeRequest request = changeRequestService.submit(
                     form.getOrDefault("studentId", ""),
                     form.getOrDefault("targetDormNumber", ""),
@@ -327,6 +338,13 @@ public class DormitoryWebServer {
             throw new ApiException(403, "当前账号没有管理员权限。");
         }
         return user;
+    }
+
+    private String requireBoundStudent(User user) {
+        if (!user.isBoundToStudent()) {
+            throw new ApiException(403, "当前普通用户未绑定学号，不能查看或提交调换申请。");
+        }
+        return user.getStudentId();
     }
 
     private Map<String, String> readForm(HttpExchange exchange) throws IOException {

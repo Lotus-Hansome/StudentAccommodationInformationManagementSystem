@@ -26,23 +26,45 @@ public class ChangeRequestService {
     }
 
     public DormChangeRequest submit(String studentId, String targetDormNumber, String targetDormPhone, String targetBedNumber, String reason) {
-        StudentDormRecord student = studentDormService.findByStudentId(studentId)
+        String normalizedStudentId = normalizeText(studentId);
+        String normalizedTargetDormNumber = normalizeText(targetDormNumber);
+        String normalizedTargetDormPhone = normalizeText(targetDormPhone);
+        String normalizedTargetBedNumber = normalizeText(targetBedNumber);
+        String normalizedReason = normalizeText(reason);
+        if (normalizedTargetDormNumber.isBlank()
+                || normalizedTargetDormPhone.isBlank()
+                || normalizedTargetBedNumber.isBlank()
+                || normalizedReason.isBlank()) {
+            throw new IllegalArgumentException("目标宿舍、目标电话、目标床位和调换理由不能为空。");
+        }
+
+        StudentDormRecord student = studentDormService.findByStudentId(normalizedStudentId)
                 .orElseThrow(() -> new IllegalArgumentException("学号不存在，不能提交调换申请。"));
-        if (!studentDormService.isBedAvailable(targetDormNumber, targetBedNumber, studentId)) {
+        boolean hasPendingRequest = requests.stream()
+                .anyMatch(request -> request.getStudentId().equalsIgnoreCase(normalizedStudentId)
+                        && request.getStatus() == ChangeRequestStatus.PENDING);
+        if (hasPendingRequest) {
+            throw new IllegalArgumentException("该学生已有待审核调换申请，请勿重复提交。");
+        }
+        if (student.isSameBed(normalizedTargetDormNumber, normalizedTargetBedNumber)) {
+            throw new IllegalArgumentException("目标床位与当前床位相同，无需提交调换申请。");
+        }
+        if (!studentDormService.isBedAvailable(normalizedTargetDormNumber, normalizedTargetBedNumber, normalizedStudentId)) {
             throw new IllegalArgumentException("目标宿舍床位已被占用，请重新选择。");
         }
+
         String id = DateTimeFormatter.ofPattern("yyyyMMddHHmmss").format(LocalDateTime.now())
                 + "-"
                 + UUID.randomUUID().toString().substring(0, 8);
         DormChangeRequest request = new DormChangeRequest(
                 id,
-                studentId,
+                normalizedStudentId,
                 student.getDormNumber(),
                 student.getBedNumber(),
-                targetDormNumber,
-                targetDormPhone,
-                targetBedNumber,
-                reason,
+                normalizedTargetDormNumber,
+                normalizedTargetDormPhone,
+                normalizedTargetBedNumber,
+                normalizedReason,
                 ChangeRequestStatus.PENDING,
                 LocalDateTime.now(),
                 null,
@@ -66,8 +88,9 @@ public class ChangeRequestService {
     }
 
     public List<DormChangeRequest> listByStudentId(String studentId) {
+        String normalizedStudentId = normalizeText(studentId);
         return requests.stream()
-                .filter(request -> request.getStudentId().equalsIgnoreCase(studentId))
+                .filter(request -> request.getStudentId().equalsIgnoreCase(normalizedStudentId))
                 .sorted(Comparator.comparing(DormChangeRequest::getCreatedAt).reversed())
                 .collect(Collectors.toList());
     }
@@ -75,6 +98,11 @@ public class ChangeRequestService {
     public void approve(String requestId, String adminComment) {
         DormChangeRequest request = findPending(requestId)
                 .orElseThrow(() -> new IllegalArgumentException("未找到待审核申请。"));
+        StudentDormRecord student = studentDormService.findByStudentId(request.getStudentId())
+                .orElseThrow(() -> new IllegalArgumentException("申请学生已不存在，无法审批通过。"));
+        if (!student.isSameBed(request.getCurrentDormNumber(), request.getCurrentBedNumber())) {
+            throw new IllegalArgumentException("学生当前床位已变化，该调换申请已过期。");
+        }
         studentDormService.updateDorm(
                 request.getStudentId(),
                 request.getTargetDormNumber(),
@@ -82,7 +110,8 @@ public class ChangeRequestService {
                 request.getTargetBedNumber());
         request.setStatus(ChangeRequestStatus.APPROVED);
         request.setHandledAt(LocalDateTime.now());
-        request.setAdminComment(adminComment);
+        request.setAdminComment(normalizeText(adminComment));
+        rejectOtherPendingRequests(request);
         save();
     }
 
@@ -91,15 +120,28 @@ public class ChangeRequestService {
                 .orElseThrow(() -> new IllegalArgumentException("未找到待审核申请。"));
         request.setStatus(ChangeRequestStatus.REJECTED);
         request.setHandledAt(LocalDateTime.now());
-        request.setAdminComment(adminComment);
+        request.setAdminComment(normalizeText(adminComment));
         save();
     }
 
     private Optional<DormChangeRequest> findPending(String requestId) {
+        String normalizedRequestId = normalizeText(requestId);
         return requests.stream()
-                .filter(request -> request.getId().equalsIgnoreCase(requestId))
+                .filter(request -> request.getId().equalsIgnoreCase(normalizedRequestId))
                 .filter(request -> request.getStatus() == ChangeRequestStatus.PENDING)
                 .findFirst();
+    }
+
+    private void rejectOtherPendingRequests(DormChangeRequest approvedRequest) {
+        for (DormChangeRequest request : requests) {
+            if (!request.getId().equals(approvedRequest.getId())
+                    && request.getStudentId().equalsIgnoreCase(approvedRequest.getStudentId())
+                    && request.getStatus() == ChangeRequestStatus.PENDING) {
+                request.setStatus(ChangeRequestStatus.REJECTED);
+                request.setHandledAt(LocalDateTime.now());
+                request.setAdminComment("已有其他调换申请通过，系统自动关闭该申请。");
+            }
+        }
     }
 
     private void save() {
@@ -108,5 +150,9 @@ public class ChangeRequestService {
         } catch (IOException e) {
             throw new IllegalStateException("保存调换申请失败：" + e.getMessage(), e);
         }
+    }
+
+    private String normalizeText(String value) {
+        return value == null ? "" : value.trim();
     }
 }

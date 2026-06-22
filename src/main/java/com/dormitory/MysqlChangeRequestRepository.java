@@ -61,7 +61,9 @@ public class MysqlChangeRequestRepository implements ChangeRequestRepository {
                     reason, status, created_at, handled_at, admin_comment
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """;
-        try (Connection connection = connectionFactory.openConnection()) {
+        Connection connection = null;
+        try {
+            connection = connectionFactory.openConnection();
             connection.setAutoCommit(false);
             try (Statement deleteStatement = connection.createStatement()) {
                 deleteStatement.executeUpdate("DELETE FROM change_requests");
@@ -86,7 +88,28 @@ public class MysqlChangeRequestRepository implements ChangeRequestRepository {
             }
             connection.commit();
         } catch (SQLException e) {
+            rollbackQuietly(connection);
             throw new IOException("保存 MySQL 调换申请失败：" + e.getMessage(), e);
+        } finally {
+            closeQuietly(connection);
+        }
+    }
+
+    private void rollbackQuietly(Connection connection) {
+        if (connection != null) {
+            try {
+                connection.rollback();
+            } catch (SQLException ignored) {
+            }
+        }
+    }
+
+    private void closeQuietly(Connection connection) {
+        if (connection != null) {
+            try {
+                connection.close();
+            } catch (SQLException ignored) {
+            }
         }
     }
 }

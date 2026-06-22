@@ -28,6 +28,7 @@ public class StudentDormService {
     }
 
     public void add(StudentDormRecord record) {
+        normalize(record);
         validateRequired(record);
         if (findByStudentId(record.getStudentId()).isPresent()) {
             throw new IllegalArgumentException("学号已存在，不能重复添加。");
@@ -40,6 +41,7 @@ public class StudentDormService {
     }
 
     public void update(StudentDormRecord record) {
+        normalize(record);
         validateRequired(record);
         StudentDormRecord existing = findByStudentId(record.getStudentId())
                 .orElseThrow(() -> new IllegalArgumentException("未找到该学生，无法修改。"));
@@ -56,9 +58,11 @@ public class StudentDormService {
     }
 
     public boolean deleteByDormAndStudent(String dormNumber, String studentId) {
+        String normalizedDormNumber = normalizeText(dormNumber);
+        String normalizedStudentId = normalizeText(studentId);
         boolean removed = records.removeIf(record ->
-                record.getDormNumber().equalsIgnoreCase(dormNumber)
-                        && record.getStudentId().equalsIgnoreCase(studentId));
+                record.getDormNumber().equalsIgnoreCase(normalizedDormNumber)
+                        && record.getStudentId().equalsIgnoreCase(normalizedStudentId));
         if (removed) {
             save();
         }
@@ -66,14 +70,16 @@ public class StudentDormService {
     }
 
     public Optional<StudentDormRecord> findByStudentId(String studentId) {
+        String normalizedStudentId = normalizeText(studentId);
         return records.stream()
-                .filter(record -> record.getStudentId().equalsIgnoreCase(studentId))
+                .filter(record -> record.getStudentId().equalsIgnoreCase(normalizedStudentId))
                 .findFirst();
     }
 
     public List<StudentDormRecord> findByDormNumber(String dormNumber) {
+        String normalizedDormNumber = normalizeText(dormNumber);
         return records.stream()
-                .filter(record -> record.getDormNumber().equalsIgnoreCase(dormNumber))
+                .filter(record -> record.getDormNumber().equalsIgnoreCase(normalizedDormNumber))
                 .sorted(Comparator.comparing(StudentDormRecord::getBedNumber))
                 .collect(Collectors.toList());
     }
@@ -94,21 +100,31 @@ public class StudentDormService {
     }
 
     public void updateDorm(String studentId, String targetDormNumber, String targetDormPhone, String targetBedNumber) {
-        StudentDormRecord record = findByStudentId(studentId)
+        String normalizedStudentId = normalizeText(studentId);
+        String normalizedDormNumber = normalizeText(targetDormNumber);
+        String normalizedDormPhone = normalizeText(targetDormPhone);
+        String normalizedBedNumber = normalizeText(targetBedNumber);
+        StudentDormRecord record = findByStudentId(normalizedStudentId)
                 .orElseThrow(() -> new IllegalArgumentException("未找到该学生，无法更新宿舍。"));
-        if (!isBedAvailable(targetDormNumber, targetBedNumber, studentId)) {
+        if (isBlank(normalizedDormNumber) || isBlank(normalizedDormPhone) || isBlank(normalizedBedNumber)) {
+            throw new IllegalArgumentException("目标宿舍、宿舍电话和床位不能为空。");
+        }
+        if (!isBedAvailable(normalizedDormNumber, normalizedBedNumber, normalizedStudentId)) {
             throw new IllegalArgumentException("目标宿舍床位已被占用。");
         }
-        record.setDormNumber(targetDormNumber);
-        record.setDormPhone(targetDormPhone);
-        record.setBedNumber(targetBedNumber);
+        record.setDormNumber(normalizedDormNumber);
+        record.setDormPhone(normalizedDormPhone);
+        record.setBedNumber(normalizedBedNumber);
         save();
     }
 
     public boolean isBedAvailable(String dormNumber, String bedNumber, String excludingStudentId) {
+        String normalizedDormNumber = normalizeText(dormNumber);
+        String normalizedBedNumber = normalizeText(bedNumber);
+        String normalizedExcludingStudentId = normalizeText(excludingStudentId);
         return records.stream().noneMatch(record ->
-                record.isSameBed(dormNumber, bedNumber)
-                        && !record.getStudentId().equalsIgnoreCase(excludingStudentId == null ? "" : excludingStudentId));
+                record.isSameBed(normalizedDormNumber, normalizedBedNumber)
+                        && !record.getStudentId().equalsIgnoreCase(normalizedExcludingStudentId));
     }
 
     public DormStatistics statisticsByDorm(String dormNumber) {
@@ -164,6 +180,20 @@ public class StudentDormService {
 
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private void normalize(StudentDormRecord record) {
+        record.setStudentId(normalizeText(record.getStudentId()));
+        record.setName(normalizeText(record.getName()));
+        record.setDepartment(normalizeText(record.getDepartment()));
+        record.setClassName(normalizeText(record.getClassName()));
+        record.setDormNumber(normalizeText(record.getDormNumber()));
+        record.setDormPhone(normalizeText(record.getDormPhone()));
+        record.setBedNumber(normalizeText(record.getBedNumber()));
+    }
+
+    private String normalizeText(String value) {
+        return value == null ? "" : value.trim();
     }
 
     private void save() {

@@ -11,22 +11,30 @@ public final class SmokeTestRunner {
         StudentDormService studentService = new StudentDormService(new CsvStudentRepository(dataDirectory, false));
         ChangeRequestService requestService = new ChangeRequestService(new CsvChangeRequestRepository(dataDirectory), studentService);
 
-        studentService.add(new StudentDormRecord("T001", "测试甲", "计算机系", "软件测试1班", "9-101", "0571-9101", "1"));
-        studentService.add(new StudentDormRecord("T002", "测试乙", "计算机系", "软件测试1班", "9-101", "0571-9101", "2"));
-        studentService.add(new StudentDormRecord("T003", "测试丙", "外语系", "英语测试1班", "9-102", "0571-9102", "1"));
+        studentService.add(new StudentDormRecord("T001", "Test A", "Computer", "Software Test 1", "9-101", "0571-9101", "1"));
+        studentService.add(new StudentDormRecord("T002", "Test B", "Computer", "Software Test 1", "9-101", "0571-9101", "2"));
+        studentService.add(new StudentDormRecord("T003", "Test C", "Foreign Language", "English Test 1", "9-102", "0571-9102", "1"));
 
-        require(studentService.findByStudentId("T001").isPresent(), "按学号查询失败");
-        require(studentService.findByDormNumber("9-101").size() == 2, "按宿舍查询失败");
-        require(studentService.sortByDepartmentAndClass().size() == 3, "排序显示失败");
+        require(studentService.findByStudentId(" T001 ").isPresent(), "student lookup should trim input");
+        require(studentService.findByDormNumber("9-101").size() == 2, "dorm lookup failed");
+        require(studentService.sortByDepartmentAndClass().size() == 3, "sort failed");
 
-        DormChangeRequest request = requestService.submit("T003", "9-101", "0571-9101", "3", "靠近实验室便于晚间调试");
-        requestService.approve(request.getId(), "床位空余，同意调换");
+        expectFailure(
+                () -> requestService.submit("T003", "9-103", "0571-9103", "1", " "),
+                "blank reason should be rejected");
+
+        DormChangeRequest request = requestService.submit("T003", "9-101", "0571-9101", "3", "Closer to the lab");
+        expectFailure(
+                () -> requestService.submit("T003", "9-103", "0571-9103", "1", "Second pending request"),
+                "duplicate pending request should be rejected");
+
+        requestService.approve(request.getId(), "Approved");
         StudentDormRecord updated = studentService.findByStudentId("T003").orElseThrow();
-        require("9-101".equals(updated.getDormNumber()) && "3".equals(updated.getBedNumber()), "调换审批后宿舍未更新");
+        require("9-101".equals(updated.getDormNumber()) && "3".equals(updated.getBedNumber()), "approved request should update dorm");
 
         DormStatistics statistics = studentService.statisticsByBuilding("9");
         String analysis = new LocalRuleDormAnalyzer().analyze(statistics);
-        require(analysis.contains("入住率"), "智能分析结果异常");
+        require(analysis.contains("入住率"), "analysis should include occupancy rate");
 
         System.out.println("SMOKE_TEST_PASSED");
         System.out.println(statistics.toPromptText());
@@ -37,5 +45,14 @@ public final class SmokeTestRunner {
         if (!condition) {
             throw new IllegalStateException(message);
         }
+    }
+
+    private static void expectFailure(Runnable action, String message) {
+        try {
+            action.run();
+        } catch (RuntimeException expected) {
+            return;
+        }
+        throw new IllegalStateException(message);
     }
 }

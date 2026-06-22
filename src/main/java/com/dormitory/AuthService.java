@@ -6,7 +6,7 @@ import java.util.Optional;
 public class AuthService {
     private final List<User> users = List.of(
             new User("admin", "admin123", UserRole.ADMIN),
-            new User("student", "student123", UserRole.USER));
+            new User("student", "student123", UserRole.USER, "20230001"));
 
     public Optional<User> login(String username, String password) {
         return users.stream()

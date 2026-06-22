@@ -2,6 +2,7 @@ const state = {
   token: "",
   role: "",
   username: "",
+  studentId: "",
   students: [],
 };
 
@@ -41,6 +42,7 @@ async function login(event) {
   state.token = data.token;
   state.role = data.role;
   state.username = data.username;
+  state.studentId = data.studentId || "";
   $("#loginPage").classList.add("hidden");
   $("#appShell").classList.remove("hidden");
   $("#currentRole").textContent = data.role === "ADMIN" ? "系统管理员" : "普通用户";
@@ -54,6 +56,7 @@ function logout() {
   state.token = "";
   state.role = "";
   state.username = "";
+  state.studentId = "";
   $("#appShell").classList.add("hidden");
   $("#loginPage").classList.remove("hidden");
 }
@@ -62,6 +65,17 @@ function applyRole() {
   const isAdmin = state.role === "ADMIN";
   $$("[data-admin-only]").forEach((node) => node.classList.toggle("hidden", !isAdmin));
   $("#requestSubmitPanel").classList.toggle("hidden", isAdmin);
+  const requestForm = $("#requestForm");
+  const requestStudentQuery = $("#requestStudentQuery");
+  if (!isAdmin && state.studentId) {
+    requestForm.studentId.value = state.studentId;
+    requestForm.studentId.readOnly = true;
+    requestStudentQuery.value = state.studentId;
+    requestStudentQuery.readOnly = true;
+  } else {
+    requestForm.studentId.readOnly = false;
+    requestStudentQuery.readOnly = false;
+  }
   if (!isAdmin && $(".nav button[data-view='analytics']").classList.contains("active")) {
     navigate("dashboard");
   }
@@ -75,7 +89,9 @@ function navigate(view) {
   $("#pageSubtitle").textContent = titles[view][1];
   if (view === "dashboard") loadOverview();
   if (view === "students") loadStudents("all");
-  if (view === "requests") loadRequests(state.role === "ADMIN" ? "pending" : "student");
+  if (view === "requests") {
+    loadRequests(state.role === "ADMIN" ? "pending" : "student", state.role === "ADMIN" ? {} : { studentId: state.studentId });
+  }
 }
 
 async function loadOverview() {
@@ -171,6 +187,9 @@ async function submitRequest(event) {
   const result = await api("/api/requests", { method: "POST", body: new FormData(form) });
   $("#requestStudentQuery").value = form.studentId.value;
   form.reset();
+  if (state.role !== "ADMIN" && state.studentId) {
+    form.studentId.value = state.studentId;
+  }
   await loadRequests("student", { studentId: $("#requestStudentQuery").value.trim() });
   toast(`申请已提交：${result.id}`);
 }
