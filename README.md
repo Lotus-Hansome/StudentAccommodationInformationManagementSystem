@@ -92,7 +92,19 @@ http://localhost:8080
 
 ## 智能分析配置
 
-如需连接真实大模型接口，请配置 OpenAI 兼容接口环境变量：
+管理员登录后可进入 **系统设置 -> 模型服务配置**，填写 OpenAI 兼容接口地址、模型名称和 API Key。配置会保存到本机：
+
+```text
+config/model.properties
+```
+
+该文件已加入 `.gitignore`，不会上传到 GitHub。页面不会回显 API Key 明文，后续修改时密钥留空会保留原密钥。可参考：
+
+```text
+config/model.example.properties
+```
+
+也可以继续使用部署环境变量：
 
 ```powershell
 $env:LLM_API_URL="https://your-provider.example/v1/chat/completions"

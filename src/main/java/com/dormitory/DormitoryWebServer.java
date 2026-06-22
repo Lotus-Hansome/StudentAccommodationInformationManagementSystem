@@ -28,6 +28,7 @@ public class DormitoryWebServer {
     private final StudentDormService studentDormService;
     private final ChangeRequestService changeRequestService;
     private final DormAnalysisService dormAnalysisService;
+    private final ModelConfigService modelConfigService;
     private final Map<String, User> sessions;
     private final Path webRoot;
     private final int port;
@@ -38,6 +39,7 @@ public class DormitoryWebServer {
         this.studentDormService = new StudentDormService(new MysqlStudentRepository(connectionFactory));
         this.changeRequestService = new ChangeRequestService(new MysqlChangeRequestRepository(connectionFactory), studentDormService);
         this.dormAnalysisService = new DormAnalysisService();
+        this.modelConfigService = new ModelConfigService();
         this.sessions = new ConcurrentHashMap<>();
         this.webRoot = webRoot;
         this.port = port;
@@ -106,6 +108,11 @@ public class DormitoryWebServer {
         if ("/api/statistics".equals(path) && "GET".equalsIgnoreCase(method)) {
             requireAdmin(exchange);
             statistics(exchange);
+            return;
+        }
+        if ("/api/model-config".equals(path)) {
+            requireAdmin(exchange);
+            modelConfig(exchange, method);
             return;
         }
         throw new ApiException(404, "接口不存在。");
@@ -250,6 +257,23 @@ public class DormitoryWebServer {
                 + "}");
     }
 
+    private void modelConfig(HttpExchange exchange, String method) throws IOException {
+        if ("GET".equalsIgnoreCase(method)) {
+            sendJson(exchange, 200, modelConfigJson(modelConfigService.loadStatusConfig()));
+            return;
+        }
+        if ("POST".equalsIgnoreCase(method)) {
+            Map<String, String> form = readForm(exchange);
+            ModelServiceConfig config = modelConfigService.saveLocalConfig(
+                    form.getOrDefault("apiUrl", ""),
+                    form.getOrDefault("apiKey", ""),
+                    form.getOrDefault("model", ""));
+            sendJson(exchange, 200, modelConfigJson(config));
+            return;
+        }
+        throw new ApiException(405, "请求方法不支持。");
+    }
+
     private StudentDormRecord studentFromForm(Map<String, String> form) {
         return new StudentDormRecord(
                 form.getOrDefault("studentId", ""),
@@ -321,6 +345,20 @@ public class DormitoryWebServer {
                 + WebJson.numberProperty("occupancyRate", Math.round(statistics.getOccupancyRate() * 10) / 10.0) + ","
                 + WebJson.property("promptText", statistics.toPromptText()) + ","
                 + "\"departments\":" + WebJson.departmentCounts(statistics.getDepartmentCounts(), statistics.getTotalStudents())
+                + "}";
+    }
+
+    private String modelConfigJson(ModelServiceConfig config) {
+        String sourceText = "environment".equals(config.getSource()) ? "环境变量" : "本地配置文件";
+        return "{"
+                + WebJson.booleanProperty("success", true) + ","
+                + WebJson.booleanProperty("configured", config.isConfigured()) + ","
+                + WebJson.booleanProperty("apiKeySet", config.hasApiKey()) + ","
+                + WebJson.property("apiUrl", config.getApiUrl()) + ","
+                + WebJson.property("model", config.getModel()) + ","
+                + WebJson.property("apiKeyMasked", config.maskedApiKey()) + ","
+                + WebJson.property("source", config.getSource()) + ","
+                + WebJson.property("sourceText", sourceText)
                 + "}";
     }
 

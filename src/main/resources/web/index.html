@@ -21,6 +21,7 @@
     <symbol id="icon-x" viewBox="0 0 24 24"><path d="m6.4 5 12.6 12.6-1.4 1.4L5 6.4 6.4 5Zm12.6 1.4L6.4 19 5 17.6 17.6 5 19 6.4Z"/></symbol>
     <symbol id="icon-brain" viewBox="0 0 24 24"><path d="M8 4a4 4 0 0 0-4 4c0 .4.1.8.2 1.2A4.5 4.5 0 0 0 6 18h2v-2H6a2.5 2.5 0 0 1-.6-4.9l1.4-.3-.6-1.3A2 2 0 0 1 8 6h1V4H8Zm8 0h-1v2h1a2 2 0 0 1 1.8 2.9l-.6 1.3 1.4.3A2.5 2.5 0 0 1 18 16h-2v2h2a4.5 4.5 0 0 0 1.8-8.8A4 4 0 0 0 16 4Zm-5 0h2v16h-2V4Z"/></symbol>
     <symbol id="icon-login" viewBox="0 0 24 24"><path d="M10 17v-4H3v-2h7V7l5 5-5 5Zm2 4v-2h7V5h-7V3h9v18h-9Z"/></symbol>
+    <symbol id="icon-settings" viewBox="0 0 24 24"><path d="M19.4 13.5a7.6 7.6 0 0 0 .1-1.5 7.6 7.6 0 0 0-.1-1.5l2-1.5-2-3.5-2.4 1a7.7 7.7 0 0 0-2.6-1.5L14 2h-4l-.4 2.5A7.7 7.7 0 0 0 7 6L4.6 5 2.6 8.5l2 1.5a7.6 7.6 0 0 0-.1 1.5c0 .5 0 1 .1 1.5l-2 1.5 2 3.5 2.4-1a7.7 7.7 0 0 0 2.6 1.5L10 22h4l.4-2.5A7.7 7.7 0 0 0 17 18l2.4 1 2-3.5-2-1.5ZM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5Z"/></symbol>
 </svg>
 
 <main id="loginPage" class="login-page">
@@ -57,6 +58,7 @@
             <button data-view="students"><svg><use href="#icon-users"></use></svg>住宿信息</button>
             <button data-view="requests"><svg><use href="#icon-swap"></use></svg>调换申请</button>
             <button data-view="analytics" data-admin-only><svg><use href="#icon-chart"></use></svg>智能分析</button>
+            <button data-view="settings" data-admin-only><svg><use href="#icon-settings"></use></svg>系统设置</button>
         </nav>
     </aside>
 
@@ -204,6 +206,43 @@
                     </div>
                 </div>
             </section>
+        </section>
+
+        <section id="settingsView" class="view">
+            <div class="settings-grid">
+                <section class="panel">
+                    <div class="panel-head">
+                        <h3>模型服务配置</h3>
+                        <span id="modelConfigStatus" class="status pending">未配置</span>
+                    </div>
+                    <form id="modelConfigForm" class="form-grid">
+                        <label>
+                            <span>接口地址</span>
+                            <input name="apiUrl" placeholder="https://api.example.com/v1/chat/completions">
+                        </label>
+                        <label>
+                            <span>模型名称</span>
+                            <input name="model" placeholder="例如 gpt-4o-mini 或兼容模型名">
+                        </label>
+                        <label>
+                            <span>API Key</span>
+                            <input name="apiKey" type="password" placeholder="留空则保留原密钥">
+                        </label>
+                        <div class="form-actions">
+                            <button type="button" id="reloadModelConfigButton" class="btn">刷新状态</button>
+                            <button class="btn primary" type="submit"><svg><use href="#icon-save"></use></svg>保存配置</button>
+                        </div>
+                    </form>
+                </section>
+                <section class="panel">
+                    <div class="panel-head"><h3>配置说明</h3></div>
+                    <div class="settings-note">
+                        <p>模型服务配置保存在服务器本机的 <code>config/model.properties</code>，该文件不会上传到 GitHub。</p>
+                        <p>页面不会回显 API Key 明文；保存时如果密钥留空，系统会保留原密钥。</p>
+                        <p>也可以继续使用部署环境变量配置模型服务，环境变量配置完整时优先使用环境变量。</p>
+                    </div>
+                </section>
+            </div>
         </section>
     </section>
 </main>

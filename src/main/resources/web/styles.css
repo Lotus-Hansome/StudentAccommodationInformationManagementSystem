@@ -280,7 +280,7 @@ svg {
     color: var(--warning);
 }
 
-.dashboard-grid, .content-grid, .analysis-grid {
+.dashboard-grid, .content-grid, .analysis-grid, .settings-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(320px, 390px);
     gap: 16px;
@@ -515,6 +515,25 @@ tbody tr:hover {
 .suggestion-box p {
     margin: 0;
     line-height: 1.8;
+}
+
+.settings-note {
+    display: grid;
+    gap: 12px;
+    padding: 16px;
+    color: var(--muted);
+    line-height: 1.7;
+}
+
+.settings-note p {
+    margin: 0;
+}
+
+code {
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: #eef3fa;
+    color: var(--text);
 }
 
 .toast {

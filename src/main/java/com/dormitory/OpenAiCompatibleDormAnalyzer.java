@@ -15,9 +15,13 @@ public class OpenAiCompatibleDormAnalyzer implements DormAnalyzer {
     private final HttpClient httpClient;
 
     public OpenAiCompatibleDormAnalyzer() {
-        this.apiUrl = firstNonBlank(System.getenv("LLM_API_URL"), toChatCompletionsUrl(System.getenv("OPENAI_BASE_URL")));
-        this.apiKey = firstNonBlank(System.getenv("LLM_API_KEY"), System.getenv("OPENAI_API_KEY"));
-        this.model = firstNonBlank(System.getenv("LLM_MODEL"), System.getenv("OPENAI_MODEL"));
+        this(new ModelConfigService().loadEffectiveConfig());
+    }
+
+    public OpenAiCompatibleDormAnalyzer(ModelServiceConfig config) {
+        this.apiUrl = config.getApiUrl();
+        this.apiKey = config.getApiKey();
+        this.model = config.getModel();
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
@@ -127,21 +131,6 @@ public class OpenAiCompatibleDormAnalyzer implements DormAnalyzer {
                 .replace("\n", "\\n")
                 .replace("\r", "\\r")
                 .replace("\t", "\\t");
-    }
-
-    private static String toChatCompletionsUrl(String baseUrl) {
-        if (isBlank(baseUrl)) {
-            return "";
-        }
-        String normalized = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
-        if (normalized.endsWith("/chat/completions")) {
-            return normalized;
-        }
-        return normalized + "/chat/completions";
-    }
-
-    private static String firstNonBlank(String first, String second) {
-        return isBlank(first) ? second : first;
     }
 
     private static boolean isBlank(String value) {

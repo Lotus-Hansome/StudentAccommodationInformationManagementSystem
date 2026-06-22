@@ -1,15 +1,14 @@
 package com.dormitory;
 
 public class DormAnalysisService {
-    private final OpenAiCompatibleDormAnalyzer remoteAnalyzer;
     private final LocalRuleDormAnalyzer localAnalyzer;
 
     public DormAnalysisService() {
-        this.remoteAnalyzer = new OpenAiCompatibleDormAnalyzer();
         this.localAnalyzer = new LocalRuleDormAnalyzer();
     }
 
     public String analyze(DormStatistics statistics) {
+        OpenAiCompatibleDormAnalyzer remoteAnalyzer = new OpenAiCompatibleDormAnalyzer();
         if (remoteAnalyzer.isConfigured()) {
             try {
                 return remoteAnalyzer.analyze(statistics);

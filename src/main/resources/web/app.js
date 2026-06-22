@@ -14,6 +14,7 @@ const titles = {
   students: ["住宿信息", "维护学生住宿台账，支持查询、排序、添加、修改和删除"],
   requests: ["调换申请", "提交、查看与审核宿舍调换申请"],
   analytics: ["智能分析", "按楼栋或宿舍生成运营评估与建议"],
+  settings: ["系统设置", "配置智能分析模型服务和运行参数"],
 };
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -33,6 +34,8 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#allRequestsButton").addEventListener("click", () => loadRequests("all"));
   $("#myRequestsButton").addEventListener("click", () => loadRequests("student", { studentId: $("#requestStudentQuery").value.trim() }));
   $("#analyzeButton").addEventListener("click", analyzeDorm);
+  $("#modelConfigForm").addEventListener("submit", saveModelConfig);
+  $("#reloadModelConfigButton").addEventListener("click", loadModelConfig);
 });
 
 async function login(event) {
@@ -79,10 +82,13 @@ function applyRole() {
   if (!isAdmin && $(".nav button[data-view='analytics']").classList.contains("active")) {
     navigate("dashboard");
   }
+  if (!isAdmin && $(".nav button[data-view='settings']").classList.contains("active")) {
+    navigate("dashboard");
+  }
 }
 
 function navigate(view) {
-  if (view === "analytics" && state.role !== "ADMIN") return;
+  if ((view === "analytics" || view === "settings") && state.role !== "ADMIN") return;
   $$(".nav button").forEach((button) => button.classList.toggle("active", button.dataset.view === view));
   $$(".view").forEach((section) => section.classList.toggle("active", section.id === `${view}View`));
   $("#pageTitle").textContent = titles[view][0];
@@ -92,6 +98,7 @@ function navigate(view) {
   if (view === "requests") {
     loadRequests(state.role === "ADMIN" ? "pending" : "student", state.role === "ADMIN" ? {} : { studentId: state.studentId });
   }
+  if (view === "settings") loadModelConfig();
 }
 
 async function loadOverview() {
@@ -256,6 +263,30 @@ async function analyzeDorm() {
   $("#analysisVacant").textContent = statistics.vacantBeds;
   $("#statisticsText").textContent = statistics.promptText;
   $("#analysisText").textContent = data.analysis;
+}
+
+async function loadModelConfig() {
+  const data = await api("/api/model-config");
+  const form = $("#modelConfigForm");
+  form.apiUrl.value = data.apiUrl || "";
+  form.model.value = data.model || "";
+  form.apiKey.value = "";
+  form.apiKey.placeholder = data.apiKeySet ? `已保存：${data.apiKeyMasked}，留空则保留` : "请输入 API Key";
+
+  const status = $("#modelConfigStatus");
+  status.textContent = data.configured ? `已配置 · ${data.sourceText}` : "未配置";
+  status.className = `status ${data.configured ? "approved" : "pending"}`;
+}
+
+async function saveModelConfig(event) {
+  event.preventDefault();
+  const data = await api("/api/model-config", { method: "POST", body: new FormData(event.currentTarget) });
+  event.currentTarget.apiKey.value = "";
+  const status = $("#modelConfigStatus");
+  status.textContent = data.configured ? `已配置 · ${data.sourceText}` : "未配置";
+  status.className = `status ${data.configured ? "approved" : "pending"}`;
+  toast(data.configured ? "模型服务配置已保存" : "配置已保存，但仍缺少接口地址、模型名或 API Key");
+  await loadModelConfig();
 }
 
 function renderDepartmentBars(departments, target) {
