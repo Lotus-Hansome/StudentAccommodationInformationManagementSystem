@@ -9,7 +9,7 @@ public class LocalRuleDormAnalyzer implements DormAnalyzer {
     public String analyze(DormStatistics statistics) {
         if (statistics.getTotalStudents() == 0) {
             return statistics.getScopeType() + statistics.getScopeValue()
-                    + "暂无入住数据，建议先完善学生住宿信息，再进行资源评估。";
+                    + "暂无入住数据。请先在“住宿信息”中添加该范围的学生记录，或选择已有入住数据的楼栋/宿舍后再生成评估。";
         }
 
         Optional<Map.Entry<String, Integer>> topDepartment = statistics.getDepartmentCounts().entrySet().stream()

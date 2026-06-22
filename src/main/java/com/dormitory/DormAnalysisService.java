@@ -14,11 +14,11 @@ public class DormAnalysisService {
             try {
                 return remoteAnalyzer.analyze(statistics);
             } catch (RuntimeException e) {
-                return "大模型接口调用失败，系统已启用本地规则分析。原因：" + e.getMessage()
+                return "智能分析服务暂时不可用，系统已切换为本地分析模式。建议稍后重试或联系管理员检查模型服务配置。"
                         + "\n" + localAnalyzer.analyze(statistics);
             }
         }
         return localAnalyzer.analyze(statistics)
-                + "\n提示：未配置 LLM_API_URL/LLM_API_KEY/LLM_MODEL，当前为本地规则分析；配置后系统会调用大模型接口。";
+                + "\n当前为本地分析模式。如需启用大模型生成更完整的运营建议，请由管理员在部署环境中配置模型服务。";
     }
 }
