@@ -468,6 +468,55 @@ tbody tr:hover {
     gap: 6px;
 }
 
+.pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 56px;
+    padding: 10px 16px;
+    border-top: 1px solid var(--line-soft);
+    color: var(--muted);
+    font-size: 13px;
+    flex-wrap: wrap;
+}
+
+.pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.page-button {
+    min-height: 32px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 5px 10px;
+    background: #fff;
+    color: var(--text);
+}
+
+.page-button:hover:not(:disabled) {
+    border-color: #b9c6d8;
+    background: #f8fafc;
+}
+
+.page-button:disabled {
+    cursor: not-allowed;
+    color: #a7b0bd;
+    background: #f5f7fa;
+}
+
+.page-index {
+    color: var(--text);
+}
+
+.pagination select {
+    min-height: 32px;
+    width: auto;
+}
+
 .form-grid {
     display: grid;
     gap: 13px;

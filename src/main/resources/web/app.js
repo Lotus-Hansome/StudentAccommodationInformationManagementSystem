@@ -4,7 +4,14 @@ const state = {
   username: "",
   studentId: "",
   students: [],
+  requests: [],
+  studentPage: 1,
+  studentPageSize: 10,
+  requestPage: 1,
+  requestPageSize: 10,
 };
+
+const pageSizeOptions = [10, 20, 50];
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => Array.from(document.querySelectorAll(selector));
@@ -69,6 +76,10 @@ async function logout() {
   state.role = "";
   state.username = "";
   state.studentId = "";
+  state.students = [];
+  state.requests = [];
+  state.studentPage = 1;
+  state.requestPage = 1;
   $("#appShell").classList.add("hidden");
   $("#loginPage").classList.remove("hidden");
   $("#currentRole").textContent = "";
@@ -128,7 +139,8 @@ async function loadStudents(mode, params = {}) {
   const query = new URLSearchParams({ mode, ...params });
   const data = await api(`/api/students?${query.toString()}`);
   state.students = data.students;
-  renderStudents(data.students);
+  state.studentPage = 1;
+  renderStudents();
 }
 
 function searchDepartmentClass() {
@@ -141,11 +153,14 @@ function searchDepartmentClass() {
   loadStudents("departmentClass", { department, className });
 }
 
-function renderStudents(students) {
+function renderStudents() {
   const tbody = $("#studentsTable");
   tbody.innerHTML = "";
-  if (!students.length) {
-    tbody.innerHTML = `<tr><td colspan="${state.role === "ADMIN" ? 8 : 7}">暂无数据</td></tr>`;
+  setPage("student", state.studentPage);
+  const students = pageItems(state.students, state.studentPage, state.studentPageSize);
+  if (!state.students.length) {
+    tbody.innerHTML = `<tr><td colspan="${studentColumnCount()}">暂无数据</td></tr>`;
+    renderPagination("studentsPagination", "student", state.students.length, state.studentPage, state.studentPageSize);
     return;
   }
   tbody.innerHTML = students.map((student) => `
@@ -163,6 +178,7 @@ function renderStudents(students) {
       </div></td>` : ""}
     </tr>
   `).join("");
+  renderPagination("studentsPagination", "student", state.students.length, state.studentPage, state.studentPageSize);
 }
 
 function editStudent(studentId) {
@@ -225,19 +241,26 @@ async function submitRequest(event) {
 
 async function loadRequests(mode, params = {}) {
   if (mode === "student" && !params.studentId) {
-    $("#requestsTable").innerHTML = `<tr><td colspan="${state.role === "ADMIN" ? 8 : 7}">请输入学号查看申请记录</td></tr>`;
+    state.requests = [];
+    state.requestPage = 1;
+    renderRequestsMessage("请输入学号查看申请记录");
     return;
   }
   const query = new URLSearchParams({ mode, ...params });
   const data = await api(`/api/requests?${query.toString()}`);
-  renderRequests(data.requests);
+  state.requests = data.requests;
+  state.requestPage = 1;
+  renderRequests();
 }
 
-function renderRequests(requests) {
+function renderRequests() {
   const tbody = $("#requestsTable");
   tbody.innerHTML = "";
-  if (!requests.length) {
-    tbody.innerHTML = `<tr><td colspan="${state.role === "ADMIN" ? 8 : 7}">暂无申请</td></tr>`;
+  setPage("request", state.requestPage);
+  const requests = pageItems(state.requests, state.requestPage, state.requestPageSize);
+  if (!state.requests.length) {
+    tbody.innerHTML = `<tr><td colspan="${requestColumnCount()}">暂无申请</td></tr>`;
+    renderPagination("requestsPagination", "request", state.requests.length, state.requestPage, state.requestPageSize);
     return;
   }
   tbody.innerHTML = requests.map((request) => `
@@ -255,6 +278,12 @@ function renderRequests(requests) {
       </div>` : ""}</td>` : ""}
     </tr>
   `).join("");
+  renderPagination("requestsPagination", "request", state.requests.length, state.requestPage, state.requestPageSize);
+}
+
+function renderRequestsMessage(message) {
+  $("#requestsTable").innerHTML = `<tr><td colspan="${requestColumnCount()}">${escapeHtml(message)}</td></tr>`;
+  renderPagination("requestsPagination", "request", 0, state.requestPage, state.requestPageSize);
 }
 
 async function decideRequest(requestId, approved) {
@@ -324,6 +353,84 @@ function renderDepartmentBars(departments, target) {
       <strong>${item.ratio}%</strong>
     </div>
   `).join("");
+}
+
+function studentColumnCount() {
+  return state.role === "ADMIN" ? 8 : 7;
+}
+
+function requestColumnCount() {
+  return state.role === "ADMIN" ? 8 : 7;
+}
+
+function pageItems(items, page, pageSize) {
+  const start = (page - 1) * pageSize;
+  return items.slice(start, start + pageSize);
+}
+
+function renderPagination(targetId, type, totalItems, currentPage, pageSize) {
+  const target = $(`#${targetId}`);
+  if (!target) return;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const safePage = Math.min(Math.max(currentPage, 1), totalPages);
+  if (safePage !== currentPage) {
+    setPage(type, safePage);
+    return;
+  }
+  const firstItem = totalItems === 0 ? 0 : (safePage - 1) * pageSize + 1;
+  const lastItem = Math.min(safePage * pageSize, totalItems);
+  const disabledPrevious = safePage <= 1 ? "disabled" : "";
+  const disabledNext = safePage >= totalPages ? "disabled" : "";
+  const options = pageSizeOptions.map((size) =>
+    `<option value="${size}" ${size === pageSize ? "selected" : ""}>${size} 条/页</option>`
+  ).join("");
+  target.innerHTML = `
+    <div class="pagination-summary">共 ${totalItems} 条 · 显示 ${firstItem}-${lastItem}</div>
+    <div class="pagination-controls">
+      <button class="page-button" type="button" ${disabledPrevious} onclick="changePage('${type}', 1)">首页</button>
+      <button class="page-button" type="button" ${disabledPrevious} onclick="changePage('${type}', ${safePage - 1})">上一页</button>
+      <span class="page-index">第 ${safePage} / ${totalPages} 页</span>
+      <button class="page-button" type="button" ${disabledNext} onclick="changePage('${type}', ${safePage + 1})">下一页</button>
+      <button class="page-button" type="button" ${disabledNext} onclick="changePage('${type}', ${totalPages})">末页</button>
+      <select aria-label="每页条数" onchange="changePageSize('${type}', this.value)">${options}</select>
+    </div>
+  `;
+}
+
+function changePage(type, page) {
+  setPage(type, page);
+  renderPagedTable(type);
+}
+
+function changePageSize(type, pageSize) {
+  const size = Number(pageSize);
+  if (!pageSizeOptions.includes(size)) return;
+  if (type === "student") {
+    state.studentPageSize = size;
+    state.studentPage = 1;
+  } else {
+    state.requestPageSize = size;
+    state.requestPage = 1;
+  }
+  renderPagedTable(type);
+}
+
+function setPage(type, page) {
+  if (type === "student") {
+    const totalPages = Math.max(1, Math.ceil(state.students.length / state.studentPageSize));
+    state.studentPage = Math.min(Math.max(Number(page) || 1, 1), totalPages);
+  } else {
+    const totalPages = Math.max(1, Math.ceil(state.requests.length / state.requestPageSize));
+    state.requestPage = Math.min(Math.max(Number(page) || 1, 1), totalPages);
+  }
+}
+
+function renderPagedTable(type) {
+  if (type === "student") {
+    renderStudents();
+  } else {
+    renderRequests();
+  }
 }
 
 function statusBadge(status, text) {

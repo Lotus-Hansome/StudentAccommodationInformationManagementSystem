@@ -71,6 +71,8 @@ public class DormitoryWebServer {
             }
         } catch (ApiException e) {
             sendJson(exchange, e.statusCode, "{\"success\":false,\"message\":" + WebJson.quote(e.getMessage()) + "}");
+        } catch (IllegalArgumentException e) {
+            sendJson(exchange, 400, "{\"success\":false,\"message\":" + WebJson.quote(e.getMessage()) + "}");
         } catch (RuntimeException e) {
             sendJson(exchange, 500, "{\"success\":false,\"message\":" + WebJson.quote(e.getMessage()) + "}");
         }
@@ -202,6 +204,9 @@ public class DormitoryWebServer {
             requireAdmin(exchange);
             Map<String, String> query = parseQuery(exchange.getRequestURI().getRawQuery());
             boolean removed = studentDormService.deleteByDormAndStudent(query.getOrDefault("dormNumber", ""), query.getOrDefault("studentId", ""));
+            if (!removed) {
+                throw new ApiException(404, "未找到匹配的住宿记录。");
+            }
             sendJson(exchange, 200, "{\"success\":true,\"removed\":" + removed + "}");
             return;
         }

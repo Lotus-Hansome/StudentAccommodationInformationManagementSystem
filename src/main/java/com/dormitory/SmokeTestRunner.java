@@ -17,7 +17,11 @@ public final class SmokeTestRunner {
 
         require(studentService.findByStudentId(" T001 ").isPresent(), "student lookup should trim input");
         require(studentService.findByDormNumber("9-101").size() == 2, "dorm lookup failed");
+        require(studentService.findByDepartmentAndClass("Computer", "").size() == 2, "department lookup failed");
+        require(studentService.findByDepartmentAndClass("", "Software").size() == 2, "class lookup failed");
+        require(studentService.findByDepartmentAndClass("Computer", "Software Test 1").size() == 2, "department and class lookup failed");
         require(studentService.sortByDepartmentAndClass().size() == 3, "sort failed");
+        require(!studentService.deleteByDormAndStudent("0-000", "NO_SUCH"), "missing delete should return false");
 
         expectFailure(
                 () -> requestService.submit("T003", "9-103", "0571-9103", "1", " "),
