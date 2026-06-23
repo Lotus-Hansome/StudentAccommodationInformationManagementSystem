@@ -22,6 +22,11 @@ public final class SmokeTestRunner {
         require(studentService.findByDepartmentAndClass("Computer", "Software Test 1").size() == 2, "department and class lookup failed");
         require(studentService.sortByDepartmentAndClass().size() == 3, "sort failed");
         require(!studentService.deleteByDormAndStudent("0-000", "NO_SUCH"), "missing delete should return false");
+        require(studentService.buildingOccupancySummaries().size() == 1, "building occupancy summary failed");
+        require(studentService.dormOccupancySummaries().size() == 2, "dorm occupancy summary failed");
+        DormOccupancySummary buildingSummary = studentService.buildingOccupancySummaries().get(0);
+        require(buildingSummary.getRoomCount() == 2 && buildingSummary.getTotalCapacity() == 12 && buildingSummary.getVacantBeds() == 9,
+                "building vacant bed calculation failed");
 
         expectFailure(
                 () -> requestService.submit("T003", "9-103", "0571-9103", "1", " "),

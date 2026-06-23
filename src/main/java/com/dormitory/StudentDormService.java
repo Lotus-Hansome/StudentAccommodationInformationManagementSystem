@@ -166,6 +166,44 @@ public class StudentDormService {
         return buildStatistics("全校", "全部宿舍", records, capacity);
     }
 
+    public List<DormOccupancySummary> buildingOccupancySummaries() {
+        Map<String, List<StudentDormRecord>> byBuilding = records.stream()
+                .collect(Collectors.groupingBy(StudentDormRecord::getBuildingNumber, TreeMap::new, Collectors.toList()));
+        return byBuilding.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey(this::compareNumbersAsText))
+                .map(entry -> {
+                    Set<String> rooms = entry.getValue().stream()
+                            .map(StudentDormRecord::getDormNumber)
+                            .collect(Collectors.toCollection(TreeSet::new));
+                    return new DormOccupancySummary(
+                            entry.getKey() + "号楼",
+                            entry.getKey(),
+                            "",
+                            rooms.size(),
+                            entry.getValue().size(),
+                            rooms.size() * DEFAULT_BEDS_PER_DORM);
+                })
+                .collect(Collectors.toList());
+    }
+
+    public List<DormOccupancySummary> dormOccupancySummaries() {
+        Map<String, List<StudentDormRecord>> byDorm = records.stream()
+                .collect(Collectors.groupingBy(StudentDormRecord::getDormNumber, TreeMap::new, Collectors.toList()));
+        return byDorm.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey(this::compareDormNumbers))
+                .map(entry -> {
+                    String buildingNumber = entry.getValue().isEmpty() ? "" : entry.getValue().get(0).getBuildingNumber();
+                    return new DormOccupancySummary(
+                            entry.getKey(),
+                            buildingNumber,
+                            entry.getKey(),
+                            1,
+                            entry.getValue().size(),
+                            DEFAULT_BEDS_PER_DORM);
+                })
+                .collect(Collectors.toList());
+    }
+
     private DormStatistics buildStatistics(String scopeType, String scopeValue, List<StudentDormRecord> matched, int capacity) {
         Map<String, Integer> departmentCounts = new LinkedHashMap<>();
         matched.stream()
@@ -202,6 +240,34 @@ public class StudentDormService {
         String actual = normalizeText(actualValue).toLowerCase(Locale.ROOT);
         String query = normalizeText(queryValue).toLowerCase(Locale.ROOT);
         return actual.contains(query);
+    }
+
+    private int compareDormNumbers(String first, String second) {
+        String firstBuilding = buildingPart(first);
+        String secondBuilding = buildingPart(second);
+        int buildingCompare = compareNumbersAsText(firstBuilding, secondBuilding);
+        if (buildingCompare != 0) {
+            return buildingCompare;
+        }
+        return compareNumbersAsText(roomPart(first), roomPart(second));
+    }
+
+    private String buildingPart(String dormNumber) {
+        int index = normalizeText(dormNumber).indexOf('-');
+        return index > 0 ? dormNumber.substring(0, index) : dormNumber;
+    }
+
+    private String roomPart(String dormNumber) {
+        int index = normalizeText(dormNumber).indexOf('-');
+        return index >= 0 && index + 1 < dormNumber.length() ? dormNumber.substring(index + 1) : "";
+    }
+
+    private int compareNumbersAsText(String first, String second) {
+        try {
+            return Integer.compare(Integer.parseInt(first), Integer.parseInt(second));
+        } catch (NumberFormatException e) {
+            return normalizeText(first).compareToIgnoreCase(normalizeText(second));
+        }
     }
 
     private void normalize(StudentDormRecord record) {

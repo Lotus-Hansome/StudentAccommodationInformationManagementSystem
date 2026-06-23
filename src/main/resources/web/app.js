@@ -46,6 +46,7 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#allRequestsButton").addEventListener("click", () => loadRequests("all"));
   $("#myRequestsButton").addEventListener("click", () => loadRequests("student", { studentId: $("#requestStudentQuery").value.trim() }));
   $("#analyzeButton").addEventListener("click", analyzeDorm);
+  $("#loadOccupancyButton").addEventListener("click", () => loadOccupancyDetails($("#occupancyScope").value));
   $("#modelConfigForm").addEventListener("submit", saveModelConfig);
   $("#reloadModelConfigButton").addEventListener("click", loadModelConfig);
 });
@@ -129,6 +130,7 @@ function navigate(view) {
   if (view === "requests") {
     loadRequests(state.role === "ADMIN" ? "pending" : "student", state.role === "ADMIN" ? {} : { studentId: state.studentId });
   }
+  if (view === "analytics") loadOccupancyDetails($("#occupancyScope").value);
   if (view === "settings") loadModelConfig();
 }
 
@@ -356,6 +358,30 @@ async function analyzeDorm() {
   $("#analysisVacant").textContent = statistics.vacantBeds;
   $("#statisticsText").textContent = statistics.promptText;
   $("#analysisText").textContent = data.analysis;
+}
+
+async function loadOccupancyDetails(scope) {
+  const query = new URLSearchParams({ scope });
+  const data = await api(`/api/occupancy?${query.toString()}`);
+  renderOccupancyDetails(data.items);
+}
+
+function renderOccupancyDetails(items) {
+  const tbody = $("#occupancyTable");
+  if (!items.length) {
+    tbody.innerHTML = `<tr><td colspan="6">暂无床位数据</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = items.map((item) => `
+    <tr>
+      <td>${escapeHtml(item.scope)}</td>
+      <td>${item.roomCount}</td>
+      <td>${item.totalStudents}</td>
+      <td>${item.totalCapacity}</td>
+      <td>${item.vacantBeds}</td>
+      <td>${item.occupancyRate}%</td>
+    </tr>
+  `).join("");
 }
 
 async function loadModelConfig() {

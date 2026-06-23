@@ -103,7 +103,7 @@
                 <section class="panel main-panel">
                     <div class="panel-head">
                         <h3>学生住宿台账</h3>
-                        <div class="toolbar">
+                        <div class="toolbar" data-admin-only>
                             <input id="studentIdQuery" placeholder="学号">
                             <button id="searchStudentButton" class="btn"><svg><use href="#icon-search"></use></svg>学号查询</button>
                             <input id="dormQuery" placeholder="宿舍号">
@@ -213,6 +213,28 @@
                         <h4>运营评估与建议</h4>
                         <p id="analysisText">请选择统计范围后生成建议。</p>
                     </div>
+                </div>
+            </section>
+            <section class="panel occupancy-panel">
+                <div class="panel-head">
+                    <h3>床位明细查询</h3>
+                    <div class="toolbar">
+                        <select id="occupancyScope">
+                            <option value="buildings">按楼栋汇总</option>
+                            <option value="dorms">按宿舍明细</option>
+                        </select>
+                        <button id="loadOccupancyButton" class="btn"><svg><use href="#icon-search"></use></svg>查询明细</button>
+                    </div>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>范围</th><th>房间数</th><th>入住人数</th><th>总床位</th><th>空余床位</th><th>入住率</th>
+                        </tr>
+                        </thead>
+                        <tbody id="occupancyTable"></tbody>
+                    </table>
                 </div>
             </section>
         </section>

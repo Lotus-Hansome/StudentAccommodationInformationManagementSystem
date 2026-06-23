@@ -116,6 +116,11 @@ public class DormitoryWebServer {
             statistics(exchange);
             return;
         }
+        if ("/api/occupancy".equals(path) && "GET".equalsIgnoreCase(method)) {
+            requireAdmin(exchange);
+            occupancy(exchange);
+            return;
+        }
         if ("/api/model-config".equals(path)) {
             requireAdmin(exchange);
             modelConfig(exchange, method);
@@ -170,7 +175,9 @@ public class DormitoryWebServer {
             Map<String, String> query = parseQuery(exchange.getRequestURI().getRawQuery());
             String mode = query.getOrDefault("mode", "all");
             List<StudentDormRecord> records;
-            if ("student".equals(mode)) {
+            if (user.getRole() != UserRole.ADMIN) {
+                records = studentDormService.findByStudentId(requireBoundStudent(user)).map(List::of).orElseGet(List::of);
+            } else if ("student".equals(mode)) {
                 records = studentDormService.findByStudentId(query.getOrDefault("studentId", "")).map(List::of).orElseGet(List::of);
             } else if ("dorm".equals(mode)) {
                 records = studentDormService.findByDormNumber(query.getOrDefault("dormNumber", ""));
@@ -278,6 +285,19 @@ public class DormitoryWebServer {
                 + "}");
     }
 
+    private void occupancy(HttpExchange exchange) throws IOException {
+        Map<String, String> query = parseQuery(exchange.getRequestURI().getRawQuery());
+        String scope = query.getOrDefault("scope", "buildings");
+        List<DormOccupancySummary> summaries = "dorms".equals(scope)
+                ? studentDormService.dormOccupancySummaries()
+                : studentDormService.buildingOccupancySummaries();
+        sendJson(exchange, 200, "{"
+                + WebJson.booleanProperty("success", true) + ","
+                + WebJson.property("scope", scope) + ","
+                + "\"items\":" + occupancyJson(summaries)
+                + "}");
+    }
+
     private void modelConfig(HttpExchange exchange, String method) throws IOException {
         if ("GET".equalsIgnoreCase(method)) {
             sendJson(exchange, 200, modelConfigJson(modelConfigService.loadStatusConfig()));
@@ -367,6 +387,28 @@ public class DormitoryWebServer {
                 + WebJson.property("promptText", statistics.toPromptText()) + ","
                 + "\"departments\":" + WebJson.departmentCounts(statistics.getDepartmentCounts(), statistics.getTotalStudents())
                 + "}";
+    }
+
+    private String occupancyJson(List<DormOccupancySummary> summaries) {
+        StringBuilder builder = new StringBuilder("[");
+        for (int i = 0; i < summaries.size(); i++) {
+            DormOccupancySummary summary = summaries.get(i);
+            if (i > 0) {
+                builder.append(',');
+            }
+            builder.append('{')
+                    .append(WebJson.property("scope", summary.getScope())).append(',')
+                    .append(WebJson.property("buildingNumber", summary.getBuildingNumber())).append(',')
+                    .append(WebJson.property("dormNumber", summary.getDormNumber())).append(',')
+                    .append(WebJson.numberProperty("roomCount", summary.getRoomCount())).append(',')
+                    .append(WebJson.numberProperty("totalStudents", summary.getTotalStudents())).append(',')
+                    .append(WebJson.numberProperty("totalCapacity", summary.getTotalCapacity())).append(',')
+                    .append(WebJson.numberProperty("vacantBeds", summary.getVacantBeds())).append(',')
+                    .append(WebJson.numberProperty("occupancyRate", Math.round(summary.getOccupancyRate() * 10) / 10.0))
+                    .append('}');
+        }
+        builder.append(']');
+        return builder.toString();
     }
 
     private String modelConfigJson(ModelServiceConfig config) {
