@@ -1,9 +1,14 @@
 package com.dormitory;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 
 public class MysqlDatabaseInitializer {
     private final MysqlConnectionFactory connectionFactory;
@@ -50,7 +55,7 @@ public class MysqlDatabaseInitializer {
                         KEY idx_request_student (student_id)
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
                     """);
-            seedStudentsIfEmpty(connection);
+            seedDemoDataIfNeeded(connection);
         } catch (SQLException e) {
             throw new IllegalStateException("初始化 MySQL 表结构失败：" + e.getMessage(), e);
         }
@@ -68,61 +73,51 @@ public class MysqlDatabaseInitializer {
         }
     }
 
-    private void seedStudentsIfEmpty(Connection connection) throws SQLException {
+    private void seedDemoDataIfNeeded(Connection connection) throws SQLException {
         try (Statement countStatement = connection.createStatement();
              var resultSet = countStatement.executeQuery("SELECT COUNT(*) FROM students")) {
             if (resultSet.next() && resultSet.getInt(1) > 0) {
                 return;
             }
         }
-        String sql = """
-                INSERT INTO students (student_id, name, department, class_name, dorm_number, dorm_phone, bed_number)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """;
-        try (PreparedStatement statement = connection.prepareStatement(sql)) {
-            insertStudent(statement, "20230001", "张明", "计算机系", "软件2301", "3-501", "0571-3501", "1");
-            insertStudent(statement, "20230002", "李华", "计算机系", "软件2301", "3-501", "0571-3501", "2");
-            insertStudent(statement, "20230003", "王芳", "信息工程系", "物联2302", "3-502", "0571-3502", "1");
-            insertStudent(statement, "20230004", "赵强", "机电工程系", "机电2301", "2-401", "0571-2401", "3");
-            insertStudent(statement, "20230005", "陈晨", "外语系", "英语2301", "2-402", "0571-2402", "2");
-            insertStudent(statement, "20230006", "刘洋", "计算机系", "网络2301", "3-502", "0571-3502", "2");
-            insertStudent(statement, "20230007", "孙悦", "计算机系", "软件2302", "4-301", "0571-4301", "1");
-            insertStudent(statement, "20230008", "周杰", "计算机系", "软件2302", "4-301", "0571-4301", "2");
-            insertStudent(statement, "20230009", "吴桐", "计算机系", "网络2302", "4-301", "0571-4301", "3");
-            insertStudent(statement, "20230010", "郑琳", "信息工程系", "物联2301", "4-302", "0571-4302", "1");
-            insertStudent(statement, "20230011", "冯凯", "信息工程系", "大数据2301", "4-302", "0571-4302", "2");
-            insertStudent(statement, "20230012", "陈雨", "信息工程系", "大数据2301", "4-302", "0571-4302", "3");
-            insertStudent(statement, "20230013", "蒋欣", "经济管理系", "会计2301", "4-303", "0571-4303", "1");
-            insertStudent(statement, "20230014", "何晨", "经济管理系", "电商2301", "4-303", "0571-4303", "2");
-            insertStudent(statement, "20230015", "马宁", "外语系", "英语2302", "4-303", "0571-4303", "3");
-            insertStudent(statement, "20230016", "朱磊", "机电工程系", "机电2302", "5-201", "0571-5201", "1");
-            insertStudent(statement, "20230017", "高洁", "机电工程系", "智能制造2301", "5-201", "0571-5201", "2");
-            insertStudent(statement, "20230018", "林浩", "艺术设计系", "视觉2301", "5-202", "0571-5202", "1");
-            insertStudent(statement, "20230019", "郭敏", "艺术设计系", "环艺2301", "5-202", "0571-5202", "2");
-            insertStudent(statement, "20230020", "宋佳", "经济管理系", "电商2302", "2-403", "0571-2403", "1");
-            insertStudent(statement, "20230021", "唐宇", "计算机系", "软件2303", "3-503", "0571-3503", "1");
-            insertStudent(statement, "20230022", "许诺", "计算机系", "软件2303", "3-503", "0571-3503", "2");
-            insertStudent(statement, "20230023", "沈琪", "信息工程系", "物联2303", "3-504", "0571-3504", "1");
-            insertStudent(statement, "20230024", "邓超", "外语系", "商务英语2301", "2-404", "0571-2404", "1");
+
+        Path seedScript = Path.of("database", "seed_demo_data.sql");
+        if (!Files.exists(seedScript)) {
+            throw new IllegalStateException("未找到演示数据脚本：" + seedScript.toAbsolutePath());
+        }
+        try (Statement statement = connection.createStatement()) {
+            for (String sql : splitSqlStatements(Files.readString(seedScript))) {
+                if (!sql.isBlank() && !sql.stripLeading().toUpperCase(Locale.ROOT).startsWith("USE ")) {
+                    statement.executeUpdate(sql);
+                }
+            }
+        } catch (IOException e) {
+            throw new IllegalStateException("读取演示数据脚本失败：" + e.getMessage(), e);
         }
     }
 
-    private void insertStudent(
-            PreparedStatement statement,
-            String studentId,
-            String name,
-            String department,
-            String className,
-            String dormNumber,
-            String dormPhone,
-            String bedNumber) throws SQLException {
-        statement.setString(1, studentId);
-        statement.setString(2, name);
-        statement.setString(3, department);
-        statement.setString(4, className);
-        statement.setString(5, dormNumber);
-        statement.setString(6, dormPhone);
-        statement.setString(7, bedNumber);
-        statement.executeUpdate();
+    private List<String> splitSqlStatements(String script) {
+        List<String> statements = new ArrayList<>();
+        StringBuilder current = new StringBuilder();
+        boolean inString = false;
+        for (int i = 0; i < script.length(); i++) {
+            char ch = script.charAt(i);
+            if (ch == '\'') {
+                current.append(ch);
+                boolean escaped = i > 0 && script.charAt(i - 1) == '\\';
+                if (!escaped) {
+                    inString = !inString;
+                }
+            } else if (ch == ';' && !inString) {
+                statements.add(current.toString().trim());
+                current.setLength(0);
+            } else {
+                current.append(ch);
+            }
+        }
+        if (!current.toString().isBlank()) {
+            statements.add(current.toString().trim());
+        }
+        return statements;
     }
 }

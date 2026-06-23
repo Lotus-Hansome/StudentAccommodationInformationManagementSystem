@@ -44,7 +44,7 @@ mysql -uroot -p < database\schema.sql
 mysql -uroot -p student_dormitory < database\seed_demo_data.sql
 ```
 
-该脚本会插入 24 条学生住宿记录，覆盖 2、3、4、5 号楼，并补充待审、已同意、已拒绝三类调换申请样例。脚本使用幂等写法，可重复执行。
+该脚本会插入 64 条学生住宿记录，覆盖 1-12 号楼，并补充 10 条待审、已同意、已拒绝调换申请样例。脚本使用幂等写法，可重复执行。
 
 ## 启动系统
 
