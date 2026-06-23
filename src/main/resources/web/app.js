@@ -9,6 +9,10 @@ const state = {
   studentPageSize: 10,
   requestPage: 1,
   requestPageSize: 10,
+  studentMode: "all",
+  studentParams: {},
+  requestMode: "pending",
+  requestParams: {},
 };
 
 const pageSizeOptions = [10, 20, 50];
@@ -29,10 +33,10 @@ document.addEventListener("DOMContentLoaded", () => {
   $$("[data-logout]").forEach((button) => button.addEventListener("click", logout));
   $$(".nav button").forEach((button) => button.addEventListener("click", () => navigate(button.dataset.view)));
 
-  $("#allStudentsButton").addEventListener("click", () => loadStudents("all"));
+  $("#allStudentsButton").addEventListener("click", showAllStudents);
   $("#sortStudentsButton").addEventListener("click", () => loadStudents("sorted"));
-  $("#searchStudentButton").addEventListener("click", () => loadStudents("student", { studentId: $("#studentIdQuery").value.trim() }));
-  $("#searchDormButton").addEventListener("click", () => loadStudents("dorm", { dormNumber: $("#dormQuery").value.trim() }));
+  $("#searchStudentButton").addEventListener("click", searchStudentById);
+  $("#searchDormButton").addEventListener("click", searchDormNumber);
   $("#searchDepartmentClassButton").addEventListener("click", searchDepartmentClass);
   $("#studentForm").addEventListener("submit", saveStudent);
   $("#resetStudentForm").addEventListener("click", resetStudentForm);
@@ -80,6 +84,10 @@ async function logout() {
   state.requests = [];
   state.studentPage = 1;
   state.requestPage = 1;
+  state.studentMode = "all";
+  state.studentParams = {};
+  state.requestMode = "pending";
+  state.requestParams = {};
   $("#appShell").classList.add("hidden");
   $("#loginPage").classList.remove("hidden");
   $("#currentRole").textContent = "";
@@ -136,11 +144,43 @@ async function loadOverview() {
 }
 
 async function loadStudents(mode, params = {}) {
+  state.studentMode = mode;
+  state.studentParams = { ...params };
   const query = new URLSearchParams({ mode, ...params });
   const data = await api(`/api/students?${query.toString()}`);
   state.students = data.students;
   state.studentPage = 1;
   renderStudents();
+}
+
+function reloadStudents() {
+  return loadStudents(state.studentMode, state.studentParams);
+}
+
+function showAllStudents() {
+  $("#studentIdQuery").value = "";
+  $("#dormQuery").value = "";
+  $("#departmentQuery").value = "";
+  $("#classQuery").value = "";
+  return loadStudents("all");
+}
+
+function searchStudentById() {
+  const studentId = $("#studentIdQuery").value.trim();
+  if (!studentId) {
+    toast("请输入学号");
+    return;
+  }
+  loadStudents("student", { studentId });
+}
+
+function searchDormNumber() {
+  const dormNumber = $("#dormQuery").value.trim();
+  if (!dormNumber) {
+    toast("请输入宿舍号");
+    return;
+  }
+  loadStudents("dorm", { dormNumber });
 }
 
 function searchDepartmentClass() {
@@ -204,7 +244,7 @@ async function saveStudent(event) {
   const method = form.mode.value === "edit" ? "PUT" : "POST";
   await api("/api/students", { method, body: data });
   resetStudentForm();
-  await loadStudents("all");
+  await showAllStudents();
   await loadOverview();
   toast("住宿信息已保存");
 }
@@ -221,7 +261,7 @@ async function deleteStudent(studentId, dormNumber) {
   if (!confirm(`确认删除学号 ${studentId} 在宿舍 ${dormNumber} 的记录吗？`)) return;
   const query = new URLSearchParams({ studentId, dormNumber });
   await api(`/api/students?${query.toString()}`, { method: "DELETE" });
-  await loadStudents("all");
+  await reloadStudents();
   await loadOverview();
   toast("记录已删除");
 }
@@ -240,6 +280,8 @@ async function submitRequest(event) {
 }
 
 async function loadRequests(mode, params = {}) {
+  state.requestMode = mode;
+  state.requestParams = { ...params };
   if (mode === "student" && !params.studentId) {
     state.requests = [];
     state.requestPage = 1;
@@ -293,7 +335,7 @@ async function decideRequest(requestId, approved) {
   body.set("requestId", requestId);
   body.set("comment", comment);
   await api(approved ? "/api/requests/approve" : "/api/requests/reject", { method: "POST", body });
-  await loadRequests("pending");
+  await loadRequests(state.requestMode, state.requestParams);
   await loadOverview();
   toast("审批已完成");
 }
