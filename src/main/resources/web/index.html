@@ -59,6 +59,7 @@
             <button data-view="students"><svg><use href="#icon-users"></use></svg>住宿信息</button>
             <button data-view="requests"><svg><use href="#icon-swap"></use></svg>调换申请</button>
             <button data-view="analytics" data-admin-only><svg><use href="#icon-chart"></use></svg>智能分析</button>
+            <button data-view="occupancy" data-admin-only><svg><use href="#icon-search"></use></svg>床位明细</button>
             <button data-view="settings" data-admin-only><svg><use href="#icon-settings"></use></svg>系统设置</button>
         </nav>
         <div class="sidebar-actions">
@@ -215,15 +216,20 @@
                     </div>
                 </div>
             </section>
-            <section class="panel occupancy-panel">
+        </section>
+
+        <section id="occupancyView" class="view">
+            <section class="panel">
                 <div class="panel-head">
                     <h3>床位明细查询</h3>
                     <div class="toolbar">
                         <select id="occupancyScope">
-                            <option value="buildings">按楼栋汇总</option>
-                            <option value="dorms">按宿舍明细</option>
+                            <option value="buildings">按楼栋查询</option>
+                            <option value="dorms">按宿舍查询</option>
                         </select>
-                        <button id="loadOccupancyButton" class="btn"><svg><use href="#icon-search"></use></svg>查询明细</button>
+                        <input id="occupancyQuery" placeholder="楼栋号">
+                        <button id="loadOccupancyButton" class="btn primary"><svg><use href="#icon-search"></use></svg>查询</button>
+                        <button id="allOccupancyButton" class="btn">全部</button>
                     </div>
                 </div>
                 <div class="table-wrap">

@@ -25,6 +25,7 @@ const titles = {
   students: ["住宿信息", "维护学生住宿台账，支持查询、排序、添加、修改和删除"],
   requests: ["调换申请", "提交、查看与审核宿舍调换申请"],
   analytics: ["智能分析", "按楼栋或宿舍生成运营评估与建议"],
+  occupancy: ["床位明细", "查询每栋楼和每个宿舍的入住、容量与空余床位"],
   settings: ["系统设置", "配置智能分析模型服务和运行参数"],
 };
 
@@ -46,7 +47,9 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#allRequestsButton").addEventListener("click", () => loadRequests("all"));
   $("#myRequestsButton").addEventListener("click", () => loadRequests("student", { studentId: $("#requestStudentQuery").value.trim() }));
   $("#analyzeButton").addEventListener("click", analyzeDorm);
-  $("#loadOccupancyButton").addEventListener("click", () => loadOccupancyDetails($("#occupancyScope").value));
+  $("#occupancyScope").addEventListener("change", updateOccupancyPlaceholder);
+  $("#loadOccupancyButton").addEventListener("click", searchOccupancyDetails);
+  $("#allOccupancyButton").addEventListener("click", showAllOccupancyDetails);
   $("#modelConfigForm").addEventListener("submit", saveModelConfig);
   $("#reloadModelConfigButton").addEventListener("click", loadModelConfig);
 });
@@ -111,16 +114,13 @@ function applyRole() {
     requestForm.studentId.readOnly = false;
     requestStudentQuery.readOnly = false;
   }
-  if (!isAdmin && $(".nav button[data-view='analytics']").classList.contains("active")) {
-    navigate("dashboard");
-  }
-  if (!isAdmin && $(".nav button[data-view='settings']").classList.contains("active")) {
+  if (!isAdmin && ["analytics", "occupancy", "settings"].some((view) => $(".nav button[data-view='" + view + "']").classList.contains("active"))) {
     navigate("dashboard");
   }
 }
 
 function navigate(view) {
-  if ((view === "analytics" || view === "settings") && state.role !== "ADMIN") return;
+  if ((view === "analytics" || view === "occupancy" || view === "settings") && state.role !== "ADMIN") return;
   $$(".nav button").forEach((button) => button.classList.toggle("active", button.dataset.view === view));
   $$(".view").forEach((section) => section.classList.toggle("active", section.id === `${view}View`));
   $("#pageTitle").textContent = titles[view][0];
@@ -130,7 +130,10 @@ function navigate(view) {
   if (view === "requests") {
     loadRequests(state.role === "ADMIN" ? "pending" : "student", state.role === "ADMIN" ? {} : { studentId: state.studentId });
   }
-  if (view === "analytics") loadOccupancyDetails($("#occupancyScope").value);
+  if (view === "occupancy") {
+    updateOccupancyPlaceholder();
+    loadOccupancyDetails($("#occupancyScope").value, $("#occupancyQuery").value.trim());
+  }
   if (view === "settings") loadModelConfig();
 }
 
@@ -360,10 +363,30 @@ async function analyzeDorm() {
   $("#analysisText").textContent = data.analysis;
 }
 
-async function loadOccupancyDetails(scope) {
-  const query = new URLSearchParams({ scope });
+async function loadOccupancyDetails(scope, value = "") {
+  const query = new URLSearchParams({ scope, value });
   const data = await api(`/api/occupancy?${query.toString()}`);
   renderOccupancyDetails(data.items);
+}
+
+function searchOccupancyDetails() {
+  const scope = $("#occupancyScope").value;
+  const value = $("#occupancyQuery").value.trim();
+  if (!value) {
+    toast(scope === "dorms" ? "请输入宿舍号" : "请输入楼栋号");
+    return;
+  }
+  loadOccupancyDetails(scope, value);
+}
+
+function showAllOccupancyDetails() {
+  $("#occupancyQuery").value = "";
+  loadOccupancyDetails($("#occupancyScope").value);
+}
+
+function updateOccupancyPlaceholder() {
+  const input = $("#occupancyQuery");
+  input.placeholder = $("#occupancyScope").value === "dorms" ? "宿舍号，如 3-501" : "楼栋号，如 3";
 }
 
 function renderOccupancyDetails(items) {

@@ -167,7 +167,13 @@ public class StudentDormService {
     }
 
     public List<DormOccupancySummary> buildingOccupancySummaries() {
+        return buildingOccupancySummaries("");
+    }
+
+    public List<DormOccupancySummary> buildingOccupancySummaries(String buildingNumber) {
+        String normalizedBuildingNumber = normalizeBuildingNumber(buildingNumber);
         Map<String, List<StudentDormRecord>> byBuilding = records.stream()
+                .filter(record -> isBlank(normalizedBuildingNumber) || record.getBuildingNumber().equalsIgnoreCase(normalizedBuildingNumber))
                 .collect(Collectors.groupingBy(StudentDormRecord::getBuildingNumber, TreeMap::new, Collectors.toList()));
         return byBuilding.entrySet().stream()
                 .sorted(Map.Entry.comparingByKey(this::compareNumbersAsText))
@@ -187,7 +193,15 @@ public class StudentDormService {
     }
 
     public List<DormOccupancySummary> dormOccupancySummaries() {
+        return dormOccupancySummaries("");
+    }
+
+    public List<DormOccupancySummary> dormOccupancySummaries(String dormNumber) {
+        String normalizedDormNumber = normalizeText(dormNumber);
         Map<String, List<StudentDormRecord>> byDorm = records.stream()
+                .filter(record -> isBlank(normalizedDormNumber)
+                        || record.getDormNumber().equalsIgnoreCase(normalizedDormNumber)
+                        || record.getDormNumber().toLowerCase(Locale.ROOT).contains(normalizedDormNumber.toLowerCase(Locale.ROOT)))
                 .collect(Collectors.groupingBy(StudentDormRecord::getDormNumber, TreeMap::new, Collectors.toList()));
         return byDorm.entrySet().stream()
                 .sorted(Map.Entry.comparingByKey(this::compareDormNumbers))
@@ -240,6 +254,24 @@ public class StudentDormService {
         String actual = normalizeText(actualValue).toLowerCase(Locale.ROOT);
         String query = normalizeText(queryValue).toLowerCase(Locale.ROOT);
         return actual.contains(query);
+    }
+
+    private String normalizeBuildingNumber(String value) {
+        String normalized = normalizeText(value);
+        if (normalized.endsWith("号楼")) {
+            return normalized.substring(0, normalized.length() - 2).trim();
+        }
+        if (normalized.endsWith("楼")) {
+            return normalized.substring(0, normalized.length() - 1).trim();
+        }
+        int digitEnd = 0;
+        while (digitEnd < normalized.length() && Character.isDigit(normalized.charAt(digitEnd))) {
+            digitEnd++;
+        }
+        if (digitEnd > 0) {
+            return normalized.substring(0, digitEnd);
+        }
+        return normalized;
     }
 
     private int compareDormNumbers(String first, String second) {

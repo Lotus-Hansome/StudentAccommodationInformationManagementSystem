@@ -288,9 +288,10 @@ public class DormitoryWebServer {
     private void occupancy(HttpExchange exchange) throws IOException {
         Map<String, String> query = parseQuery(exchange.getRequestURI().getRawQuery());
         String scope = query.getOrDefault("scope", "buildings");
+        String value = query.getOrDefault("value", "");
         List<DormOccupancySummary> summaries = "dorms".equals(scope)
-                ? studentDormService.dormOccupancySummaries()
-                : studentDormService.buildingOccupancySummaries();
+                ? studentDormService.dormOccupancySummaries(value)
+                : studentDormService.buildingOccupancySummaries(value);
         sendJson(exchange, 200, "{"
                 + WebJson.booleanProperty("success", true) + ","
                 + WebJson.property("scope", scope) + ","

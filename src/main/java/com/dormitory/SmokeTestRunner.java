@@ -24,6 +24,8 @@ public final class SmokeTestRunner {
         require(!studentService.deleteByDormAndStudent("0-000", "NO_SUCH"), "missing delete should return false");
         require(studentService.buildingOccupancySummaries().size() == 1, "building occupancy summary failed");
         require(studentService.dormOccupancySummaries().size() == 2, "dorm occupancy summary failed");
+        require(studentService.buildingOccupancySummaries("9").size() == 1, "filtered building occupancy summary failed");
+        require(studentService.dormOccupancySummaries("9-101").size() == 1, "filtered dorm occupancy summary failed");
         DormOccupancySummary buildingSummary = studentService.buildingOccupancySummaries().get(0);
         require(buildingSummary.getRoomCount() == 2 && buildingSummary.getTotalCapacity() == 12 && buildingSummary.getVacantBeds() == 9,
                 "building vacant bed calculation failed");
