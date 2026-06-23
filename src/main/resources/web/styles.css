@@ -310,7 +310,7 @@ svg {
     color: var(--warning);
 }
 
-.dashboard-grid, .content-grid, .analysis-grid {
+.dashboard-grid, .content-grid, .analysis-grid, .split-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(320px, 390px);
     gap: 16px;
@@ -330,6 +330,10 @@ svg {
 
 .analysis-grid {
     grid-template-columns: minmax(0, 0.95fr) minmax(360px, 1.05fr);
+}
+
+.split-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
 }
 
 .panel {
@@ -527,6 +531,26 @@ tbody tr:hover {
     grid-column: 1 / -1;
 }
 
+.inline-form {
+    grid-template-columns: repeat(3, minmax(120px, 1fr));
+    align-items: end;
+}
+
+.inline-form .btn {
+    min-width: 96px;
+}
+
+.check-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.check-row input {
+    width: auto;
+    min-height: auto;
+}
+
 .progress-track {
     height: 16px;
     margin: 20px 16px 24px;
@@ -635,12 +659,30 @@ code {
     box-shadow: var(--shadow);
 }
 
+.modal {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background: rgba(15, 23, 42, 0.38);
+}
+
+.modal-card {
+    width: min(460px, 100%);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: #fff;
+    box-shadow: var(--shadow);
+}
+
 @media (max-width: 1120px) {
     .app-shell {
         grid-template-columns: 210px minmax(0, 1fr);
     }
 
-    .content-grid, .analysis-grid, .dashboard-grid {
+    .content-grid, .analysis-grid, .dashboard-grid, .split-grid {
         grid-template-columns: 1fr;
     }
 }
@@ -665,6 +707,10 @@ code {
     }
 
     .metric-grid, .metric-grid.compact {
+        grid-template-columns: 1fr;
+    }
+
+    .inline-form {
         grid-template-columns: 1fr;
     }
 

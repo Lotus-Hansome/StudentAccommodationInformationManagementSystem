@@ -23,6 +23,9 @@
     <symbol id="icon-login" viewBox="0 0 24 24"><path d="M10 17v-4H3v-2h7V7l5 5-5 5Zm2 4v-2h7V5h-7V3h9v18h-9Z"/></symbol>
     <symbol id="icon-logout" viewBox="0 0 24 24"><path d="M16 17v-4H9v-2h7V7l5 5-5 5ZM4 21V3h9v2H6v14h7v2H4Z"/></symbol>
     <symbol id="icon-settings" viewBox="0 0 24 24"><path d="M19.4 13.5a7.6 7.6 0 0 0 .1-1.5 7.6 7.6 0 0 0-.1-1.5l2-1.5-2-3.5-2.4 1a7.7 7.7 0 0 0-2.6-1.5L14 2h-4l-.4 2.5A7.7 7.7 0 0 0 7 6L4.6 5 2.6 8.5l2 1.5a7.6 7.6 0 0 0-.1 1.5c0 .5 0 1 .1 1.5l-2 1.5 2 3.5 2.4-1a7.7 7.7 0 0 0 2.6 1.5L10 22h4l.4-2.5A7.7 7.7 0 0 0 17 18l2.4 1 2-3.5-2-1.5ZM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5Z"/></symbol>
+    <symbol id="icon-building" viewBox="0 0 24 24"><path d="M4 21V3h10v4h6v14h-2V9h-4v12H4Zm2-2h2v-3h2v3h2V5H6v14Zm2-11h2v2H8V8Zm0 4h2v2H8v-2Z"/></symbol>
+    <symbol id="icon-key" viewBox="0 0 24 24"><path d="M7.5 14A5.5 5.5 0 1 1 13 8.5c0 .6-.1 1.1-.3 1.7L22 19.5V22h-3v-2h-2v-2h-2.5l-3.2-3.2c-1.1.7-2.4 1.2-3.8 1.2ZM7.5 12A3.5 3.5 0 1 0 4 8.5 3.5 3.5 0 0 0 7.5 12Z"/></symbol>
+    <symbol id="icon-log" viewBox="0 0 24 24"><path d="M5 3h14v18H5V3Zm2 2v14h10V5H7Zm2 3h6v2H9V8Zm0 4h6v2H9v-2Z"/></symbol>
 </svg>
 
 <main id="loginPage" class="login-page">
@@ -31,17 +34,10 @@
         <h1>学生宿舍信息管理系统</h1>
         <p>集中住宿管理 · 调换审批 · 智能分析</p>
         <form id="loginForm" class="login-form">
-            <label>
-                <span>用户名</span>
-                <input name="username" value="admin" autocomplete="username">
-            </label>
-            <label>
-                <span>密码</span>
-                <input name="password" value="admin123" type="password" autocomplete="current-password">
-            </label>
+            <label><span>用户名</span><input name="username" autocomplete="username" required></label>
+            <label><span>密码</span><input name="password" type="password" autocomplete="current-password" required></label>
             <button class="btn primary full" type="submit"><svg><use href="#icon-login"></use></svg>登录</button>
         </form>
-        <div class="login-hint">admin/admin123 · student/student123</div>
     </section>
 </main>
 
@@ -49,10 +45,7 @@
     <aside class="sidebar">
         <div class="brand">
             <div class="brand-logo">SA</div>
-            <div>
-                <strong>宿舍管理</strong>
-                <span>Dormitory Console</span>
-            </div>
+            <div><strong>宿舍管理</strong><span>Dormitory Console</span></div>
         </div>
         <nav class="nav">
             <button data-view="dashboard" class="active"><svg><use href="#icon-dashboard"></use></svg>数据看板</button>
@@ -60,6 +53,9 @@
             <button data-view="requests"><svg><use href="#icon-swap"></use></svg>调换申请</button>
             <button data-view="analytics" data-admin-only><svg><use href="#icon-chart"></use></svg>智能分析</button>
             <button data-view="occupancy" data-admin-only><svg><use href="#icon-search"></use></svg>床位明细</button>
+            <button data-view="infrastructure" data-admin-only><svg><use href="#icon-building"></use></svg>基础数据</button>
+            <button data-view="users" data-admin-only><svg><use href="#icon-key"></use></svg>账号管理</button>
+            <button data-view="audit" data-admin-only><svg><use href="#icon-log"></use></svg>操作日志</button>
             <button data-view="settings" data-admin-only><svg><use href="#icon-settings"></use></svg>系统设置</button>
         </nav>
         <div class="sidebar-actions">
@@ -69,13 +65,11 @@
 
     <section class="workspace">
         <header class="topbar">
-            <div>
-                <h2 id="pageTitle">数据看板</h2>
-                <span id="pageSubtitle">实时掌握宿舍入住和调换申请状态</span>
-            </div>
+            <div><h2 id="pageTitle">数据看板</h2><span id="pageSubtitle">实时掌握宿舍入住和调换申请状态</span></div>
             <div class="user-box">
                 <span id="currentRole" class="role-pill"></span>
                 <strong id="currentUser"></strong>
+                <button id="passwordButton" class="btn"><svg><use href="#icon-key"></use></svg>修改密码</button>
                 <button id="logoutButton" class="btn logout-inline" data-logout><svg><use href="#icon-logout"></use></svg>退出登录</button>
             </div>
         </header>
@@ -109,20 +103,18 @@
                             <button id="searchStudentButton" class="btn"><svg><use href="#icon-search"></use></svg>学号查询</button>
                             <input id="dormQuery" placeholder="宿舍号">
                             <button id="searchDormButton" class="btn"><svg><use href="#icon-search"></use></svg>宿舍查询</button>
+                            <input id="studentBuildingQuery" placeholder="楼栋">
                             <input id="departmentQuery" placeholder="所在系">
                             <input id="classQuery" placeholder="班级">
-                            <button id="searchDepartmentClassButton" class="btn"><svg><use href="#icon-search"></use></svg>系/班级查询</button>
+                            <input id="studentKeywordQuery" placeholder="关键词">
+                            <button id="advancedStudentSearchButton" class="btn"><svg><use href="#icon-search"></use></svg>组合查询</button>
                             <button id="sortStudentsButton" class="btn">按系/班级</button>
                             <button id="allStudentsButton" class="btn">全部</button>
                         </div>
                     </div>
                     <div class="table-wrap">
                         <table>
-                            <thead>
-                            <tr>
-                                <th>学号</th><th>姓名</th><th>所在系</th><th>班级</th><th>宿舍号</th><th>宿舍电话</th><th>床位</th><th data-admin-only>操作</th>
-                            </tr>
-                            </thead>
+                            <thead><tr><th>学号</th><th>姓名</th><th>所在系</th><th>班级</th><th>宿舍号</th><th>宿舍电话</th><th>床位</th><th data-admin-only>操作</th></tr></thead>
                             <tbody id="studentsTable"></tbody>
                         </table>
                     </div>
@@ -136,7 +128,7 @@
                         <label><span>姓名</span><input name="name" required></label>
                         <label><span>所在系</span><input name="department" required></label>
                         <label><span>班级</span><input name="className" required></label>
-                        <label><span>宿舍号</span><input name="dormNumber" placeholder="如 3-501" required></label>
+                        <label><span>宿舍号</span><input name="dormNumber" required></label>
                         <label><span>宿舍电话</span><input name="dormPhone" required></label>
                         <label><span>床位</span><input name="bedNumber" required></label>
                         <div class="form-actions">
@@ -154,13 +146,11 @@
                     <div class="panel-head"><h3>提交调换申请</h3></div>
                     <form id="requestForm" class="form-grid">
                         <label><span>学号</span><input name="studentId" required></label>
-                        <label><span>目标宿舍</span><input name="targetDormNumber" placeholder="如 3-503" required></label>
+                        <label><span>目标宿舍</span><input name="targetDormNumber" required></label>
                         <label><span>目标电话</span><input name="targetDormPhone" required></label>
                         <label><span>目标床位</span><input name="targetBedNumber" required></label>
                         <label class="wide"><span>调换理由</span><textarea name="reason" rows="5" required></textarea></label>
-                        <div class="form-actions">
-                            <button class="btn primary" type="submit"><svg><use href="#icon-plus"></use></svg>提交</button>
-                        </div>
+                        <div class="form-actions"><button class="btn primary" type="submit"><svg><use href="#icon-plus"></use></svg>提交</button></div>
                     </form>
                 </section>
                 <section class="panel main-panel">
@@ -169,17 +159,13 @@
                         <div class="toolbar">
                             <button id="pendingRequestsButton" class="btn" data-admin-only>待审核</button>
                             <button id="allRequestsButton" class="btn" data-admin-only>全部申请</button>
-                            <input id="requestStudentQuery" placeholder="按学号查看">
+                            <input id="requestStudentQuery" placeholder="学号">
                             <button id="myRequestsButton" class="btn">查看记录</button>
                         </div>
                     </div>
                     <div class="table-wrap">
                         <table>
-                            <thead>
-                            <tr>
-                                <th>申请编号</th><th>学号</th><th>原宿舍</th><th>目标宿舍</th><th>状态</th><th>申请时间</th><th>理由/意见</th><th data-admin-only>操作</th>
-                            </tr>
-                            </thead>
+                            <thead><tr><th>申请编号</th><th>学号</th><th>原宿舍</th><th>目标宿舍</th><th>状态</th><th>申请时间</th><th>处理时间</th><th>理由/意见</th><th>操作</th></tr></thead>
                             <tbody id="requestsTable"></tbody>
                         </table>
                     </div>
@@ -193,10 +179,7 @@
                 <div class="panel-head">
                     <h3>宿舍统计与智能建议</h3>
                     <div class="toolbar">
-                        <select id="analysisScope">
-                            <option value="building">楼栋</option>
-                            <option value="dorm">宿舍</option>
-                        </select>
+                        <select id="analysisScope"><option value="building">楼栋</option><option value="dorm">宿舍</option></select>
                         <input id="analysisValue" value="3" placeholder="楼栋号或宿舍号">
                         <button id="analyzeButton" class="btn primary"><svg><use href="#icon-brain"></use></svg>生成建议</button>
                     </div>
@@ -210,10 +193,7 @@
                         </div>
                         <pre id="statisticsText" class="stat-box"></pre>
                     </div>
-                    <div class="suggestion-box">
-                        <h4>运营评估与建议</h4>
-                        <p id="analysisText">请选择统计范围后生成建议。</p>
-                    </div>
+                    <div class="suggestion-box"><h4>运营评估与建议</h4><p id="analysisText">请选择统计范围后生成建议。</p></div>
                 </div>
             </section>
         </section>
@@ -223,48 +203,99 @@
                 <div class="panel-head">
                     <h3>床位明细查询</h3>
                     <div class="toolbar">
-                        <select id="occupancyScope">
-                            <option value="buildings">按楼栋查询</option>
-                            <option value="dorms">按宿舍查询</option>
-                        </select>
+                        <select id="occupancyScope"><option value="buildings">按楼栋查询</option><option value="dorms">按宿舍查询</option></select>
                         <input id="occupancyQuery" placeholder="楼栋号">
                         <button id="loadOccupancyButton" class="btn primary"><svg><use href="#icon-search"></use></svg>查询</button>
                         <button id="allOccupancyButton" class="btn">全部</button>
                     </div>
                 </div>
                 <div class="table-wrap">
-                    <table>
-                        <thead>
-                        <tr>
-                            <th>范围</th><th>房间数</th><th>入住人数</th><th>总床位</th><th>空余床位</th><th>入住率</th>
-                        </tr>
-                        </thead>
-                        <tbody id="occupancyTable"></tbody>
-                    </table>
+                    <table><thead><tr><th>范围</th><th>房间数</th><th>入住人数</th><th>总床位</th><th>空余床位</th><th>入住率</th></tr></thead><tbody id="occupancyTable"></tbody></table>
                 </div>
+            </section>
+        </section>
+
+        <section id="infrastructureView" class="view">
+            <div class="split-grid">
+                <section class="panel">
+                    <div class="panel-head">
+                        <h3>楼栋管理</h3>
+                        <div class="toolbar"><input id="buildingKeyword" placeholder="楼栋"><button id="searchBuildingsButton" class="btn"><svg><use href="#icon-search"></use></svg>查询</button></div>
+                    </div>
+                    <form id="buildingForm" class="form-grid inline-form">
+                        <input name="buildingNumber" placeholder="楼栋号" required>
+                        <input name="buildingName" placeholder="楼栋名称" required>
+                        <select name="genderType"><option value="MALE">男生</option><option value="FEMALE">女生</option><option value="MIXED">混合</option></select>
+                        <input name="totalFloors" type="number" min="1" value="6" required>
+                        <select name="status"><option value="ACTIVE">启用</option><option value="DISABLED">停用</option></select>
+                        <button class="btn primary" type="submit"><svg><use href="#icon-save"></use></svg>保存</button>
+                    </form>
+                    <div class="table-wrap"><table><thead><tr><th>楼栋号</th><th>名称</th><th>类型</th><th>楼层</th><th>状态</th><th>操作</th></tr></thead><tbody id="buildingsTable"></tbody></table></div>
+                </section>
+                <section class="panel">
+                    <div class="panel-head">
+                        <h3>宿舍管理</h3>
+                        <div class="toolbar"><input id="roomBuildingQuery" placeholder="楼栋"><input id="roomKeyword" placeholder="宿舍"><button id="searchRoomsButton" class="btn"><svg><use href="#icon-search"></use></svg>查询</button></div>
+                    </div>
+                    <form id="roomForm" class="form-grid inline-form">
+                        <input name="dormNumber" placeholder="宿舍号" required>
+                        <input name="buildingNumber" placeholder="楼栋号" required>
+                        <input name="floorNumber" type="number" min="1" placeholder="楼层" required>
+                        <input name="roomType" placeholder="房型" value="标准六人间" required>
+                        <select name="genderType"><option value="MALE">男生</option><option value="FEMALE">女生</option><option value="MIXED">混合</option></select>
+                        <input name="capacity" type="number" min="1" max="8" value="6" required>
+                        <input name="phone" placeholder="电话" required>
+                        <select name="status"><option value="ACTIVE">启用</option><option value="DISABLED">停用</option></select>
+                        <button class="btn primary" type="submit"><svg><use href="#icon-save"></use></svg>保存</button>
+                    </form>
+                    <div class="table-wrap"><table><thead><tr><th>宿舍</th><th>楼栋</th><th>楼层</th><th>容量</th><th>电话</th><th>状态</th><th>操作</th></tr></thead><tbody id="roomsTable"></tbody></table></div>
+                </section>
+            </div>
+        </section>
+
+        <section id="usersView" class="view">
+            <div class="content-grid">
+                <section class="panel main-panel">
+                    <div class="panel-head"><h3>系统账号</h3><button id="reloadUsersButton" class="btn">刷新</button></div>
+                    <div class="table-wrap"><table><thead><tr><th>用户名</th><th>角色</th><th>绑定学号</th><th>状态</th><th>操作</th></tr></thead><tbody id="usersTable"></tbody></table></div>
+                </section>
+                <aside class="panel editor-panel">
+                    <div class="panel-head"><h3 id="userFormTitle">新增账号</h3></div>
+                    <form id="userForm" class="form-grid">
+                        <input type="hidden" name="mode" value="create">
+                        <label><span>用户名</span><input name="username" required></label>
+                        <label id="userPasswordRow"><span>初始密码</span><input name="password" type="password"></label>
+                        <label><span>角色</span><select name="role"><option value="USER">普通用户</option><option value="ADMIN">管理员</option></select></label>
+                        <label><span>绑定学号</span><input name="studentId"></label>
+                        <label class="check-row"><input name="enabled" type="checkbox" checked><span>启用账号</span></label>
+                        <div class="form-actions">
+                            <button type="button" id="resetUserFormButton" class="btn">重置</button>
+                            <button class="btn primary" type="submit"><svg><use href="#icon-save"></use></svg>保存</button>
+                        </div>
+                    </form>
+                </aside>
+            </div>
+        </section>
+
+        <section id="auditView" class="view">
+            <section class="panel">
+                <div class="panel-head">
+                    <h3>操作日志</h3>
+                    <div class="toolbar"><input id="auditKeyword" placeholder="关键词"><button id="searchAuditButton" class="btn"><svg><use href="#icon-search"></use></svg>查询</button></div>
+                </div>
+                <div class="table-wrap"><table><thead><tr><th>时间</th><th>操作人</th><th>动作</th><th>对象</th><th>编号</th><th>详情</th></tr></thead><tbody id="auditTable"></tbody></table></div>
+                <div id="auditPagination" class="pagination"></div>
             </section>
         </section>
 
         <section id="settingsView" class="view">
             <div class="settings-grid">
                 <section class="panel">
-                    <div class="panel-head">
-                        <h3>模型服务配置</h3>
-                        <span id="modelConfigStatus" class="status pending">未配置</span>
-                    </div>
+                    <div class="panel-head"><h3>模型服务配置</h3><span id="modelConfigStatus" class="status pending">未配置</span></div>
                     <form id="modelConfigForm" class="form-grid">
-                        <label>
-                            <span>接口地址</span>
-                            <input name="apiUrl">
-                        </label>
-                        <label>
-                            <span>模型名称</span>
-                            <input name="model">
-                        </label>
-                        <label>
-                            <span>API Key</span>
-                            <input name="apiKey" type="password">
-                        </label>
+                        <label><span>接口地址</span><input name="apiUrl"></label>
+                        <label><span>模型名称</span><input name="model"></label>
+                        <label><span>API Key</span><input name="apiKey" type="password"></label>
                         <div class="form-actions">
                             <button type="button" id="reloadModelConfigButton" class="btn">刷新状态</button>
                             <button class="btn primary" type="submit"><svg><use href="#icon-save"></use></svg>保存配置</button>
@@ -275,6 +306,17 @@
         </section>
     </section>
 </main>
+
+<div id="passwordDialog" class="modal hidden" role="dialog" aria-modal="true">
+    <form id="passwordForm" class="modal-card">
+        <div class="panel-head"><h3>修改密码</h3><button type="button" id="closePasswordDialog" class="btn">关闭</button></div>
+        <div class="form-grid">
+            <label><span>原密码</span><input name="oldPassword" type="password" required></label>
+            <label><span>新密码</span><input name="newPassword" type="password" minlength="6" required></label>
+            <div class="form-actions"><button class="btn primary" type="submit"><svg><use href="#icon-save"></use></svg>保存</button></div>
+        </div>
+    </form>
+</div>
 
 <div id="toast" class="toast hidden"></div>
 <script src="/app.js"></script>

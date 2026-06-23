@@ -46,6 +46,13 @@ public class ChangeRequestService {
         if (hasPendingRequest) {
             throw new IllegalArgumentException("该学生已有待审核调换申请，请勿重复提交。");
         }
+        boolean targetLocked = requests.stream()
+                .anyMatch(request -> request.getStatus() == ChangeRequestStatus.PENDING
+                        && request.getTargetDormNumber().equalsIgnoreCase(normalizedTargetDormNumber)
+                        && request.getTargetBedNumber().equalsIgnoreCase(normalizedTargetBedNumber));
+        if (targetLocked) {
+            throw new IllegalArgumentException("目标床位已有待审核调换申请，暂时不能重复申请。");
+        }
         if (student.isSameBed(normalizedTargetDormNumber, normalizedTargetBedNumber)) {
             throw new IllegalArgumentException("目标床位与当前床位相同，无需提交调换申请。");
         }
@@ -96,6 +103,10 @@ public class ChangeRequestService {
     }
 
     public void approve(String requestId, String adminComment) {
+        String normalizedComment = normalizeText(adminComment);
+        if (normalizedComment.isBlank()) {
+            throw new IllegalArgumentException("审批意见不能为空。");
+        }
         DormChangeRequest request = findPending(requestId)
                 .orElseThrow(() -> new IllegalArgumentException("未找到待审核申请。"));
         StudentDormRecord student = studentDormService.findByStudentId(request.getStudentId())
@@ -110,17 +121,36 @@ public class ChangeRequestService {
                 request.getTargetBedNumber());
         request.setStatus(ChangeRequestStatus.APPROVED);
         request.setHandledAt(LocalDateTime.now());
-        request.setAdminComment(normalizeText(adminComment));
+        request.setAdminComment(normalizedComment);
         rejectOtherPendingRequests(request);
         save();
     }
 
     public void reject(String requestId, String adminComment) {
+        String normalizedComment = normalizeText(adminComment);
+        if (normalizedComment.isBlank()) {
+            throw new IllegalArgumentException("审批意见不能为空。");
+        }
         DormChangeRequest request = findPending(requestId)
                 .orElseThrow(() -> new IllegalArgumentException("未找到待审核申请。"));
         request.setStatus(ChangeRequestStatus.REJECTED);
         request.setHandledAt(LocalDateTime.now());
-        request.setAdminComment(normalizeText(adminComment));
+        request.setAdminComment(normalizedComment);
+        save();
+    }
+
+    public void cancel(String requestId, String studentId) {
+        String normalizedRequestId = normalizeText(requestId);
+        String normalizedStudentId = normalizeText(studentId);
+        DormChangeRequest request = requests.stream()
+                .filter(item -> item.getId().equalsIgnoreCase(normalizedRequestId))
+                .filter(item -> item.getStudentId().equalsIgnoreCase(normalizedStudentId))
+                .filter(item -> item.getStatus() == ChangeRequestStatus.PENDING)
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("未找到可撤回的待审核申请。"));
+        request.setStatus(ChangeRequestStatus.CANCELED);
+        request.setHandledAt(LocalDateTime.now());
+        request.setAdminComment("学生主动撤回。");
         save();
     }
 

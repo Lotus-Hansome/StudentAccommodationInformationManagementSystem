@@ -17,10 +17,16 @@ public class StudentDormService {
     public static final int DEFAULT_BEDS_PER_DORM = 6;
 
     private final StudentRepository repository;
+    private final DormInfrastructureService infrastructureService;
     private final List<StudentDormRecord> records;
 
     public StudentDormService(StudentRepository repository) {
+        this(repository, null);
+    }
+
+    public StudentDormService(StudentRepository repository, DormInfrastructureService infrastructureService) {
         this.repository = repository;
+        this.infrastructureService = infrastructureService;
         try {
             this.records = new ArrayList<>(repository.load());
         } catch (IOException e) {
@@ -37,6 +43,7 @@ public class StudentDormService {
         if (!isBedAvailable(record.getDormNumber(), record.getBedNumber(), record.getStudentId())) {
             throw new IllegalArgumentException("目标宿舍床位已被占用。");
         }
+        record.setDormPhone(resolveDormPhone(record.getDormNumber(), record.getDormPhone()));
         records.add(record);
         save();
     }
@@ -49,6 +56,7 @@ public class StudentDormService {
         if (!isBedAvailable(record.getDormNumber(), record.getBedNumber(), record.getStudentId())) {
             throw new IllegalArgumentException("目标宿舍床位已被占用。");
         }
+        record.setDormPhone(resolveDormPhone(record.getDormNumber(), record.getDormPhone()));
         existing.setName(record.getName());
         existing.setDepartment(record.getDepartment());
         existing.setClassName(record.getClassName());
@@ -112,6 +120,23 @@ public class StudentDormService {
                 .collect(Collectors.toList());
     }
 
+    public PageResult<StudentDormRecord> search(StudentSearchCriteria criteria) {
+        if (repository instanceof MysqlStudentRepository mysqlRepository) {
+            try {
+                return mysqlRepository.search(criteria);
+            } catch (IOException e) {
+                throw new IllegalStateException("分页查询学生住宿数据失败：" + e.getMessage(), e);
+            }
+        }
+        List<StudentDormRecord> filtered = filterRecords(criteria);
+        int total = filtered.size();
+        int page = criteria.getPage();
+        int pageSize = criteria.getPageSize();
+        int from = Math.min((page - 1) * pageSize, total);
+        int to = Math.min(from + pageSize, total);
+        return new PageResult<>(filtered.subList(from, to), total, page, pageSize);
+    }
+
     public void updateDorm(String studentId, String targetDormNumber, String targetDormPhone, String targetBedNumber) {
         String normalizedStudentId = normalizeText(studentId);
         String normalizedDormNumber = normalizeText(targetDormNumber);
@@ -126,7 +151,7 @@ public class StudentDormService {
             throw new IllegalArgumentException("目标宿舍床位已被占用。");
         }
         record.setDormNumber(normalizedDormNumber);
-        record.setDormPhone(normalizedDormPhone);
+        record.setDormPhone(resolveDormPhone(normalizedDormNumber, normalizedDormPhone));
         record.setBedNumber(normalizedBedNumber);
         save();
     }
@@ -135,6 +160,7 @@ public class StudentDormService {
         String normalizedDormNumber = normalizeText(dormNumber);
         String normalizedBedNumber = normalizeText(bedNumber);
         String normalizedExcludingStudentId = normalizeText(excludingStudentId);
+        validateBedExists(normalizedDormNumber, normalizedBedNumber);
         return records.stream().noneMatch(record ->
                 record.isSameBed(normalizedDormNumber, normalizedBedNumber)
                         && !record.getStudentId().equalsIgnoreCase(normalizedExcludingStudentId));
@@ -142,27 +168,38 @@ public class StudentDormService {
 
     public DormStatistics statisticsByDorm(String dormNumber) {
         List<StudentDormRecord> matched = findByDormNumber(dormNumber);
-        int capacity = DEFAULT_BEDS_PER_DORM;
+        int capacity = infrastructureService == null || !infrastructureService.hasInfrastructureData()
+                ? DEFAULT_BEDS_PER_DORM
+                : infrastructureService.roomCapacity(dormNumber);
         return buildStatistics("宿舍", dormNumber, matched, capacity);
     }
 
     public DormStatistics statisticsByBuilding(String buildingNumber) {
-        String trimmed = buildingNumber.trim();
+        String trimmed = infrastructureService == null
+                ? buildingNumber.trim()
+                : infrastructureService.normalizeBuildingNumber(buildingNumber);
         List<StudentDormRecord> matched = records.stream()
                 .filter(record -> record.getBuildingNumber().equalsIgnoreCase(trimmed))
                 .collect(Collectors.toList());
-        Set<String> rooms = matched.stream()
-                .map(StudentDormRecord::getDormNumber)
-                .collect(Collectors.toCollection(TreeSet::new));
-        int capacity = rooms.size() * DEFAULT_BEDS_PER_DORM;
+        Set<String> rooms = infrastructureService == null || !infrastructureService.hasInfrastructureData()
+                ? matched.stream().map(StudentDormRecord::getDormNumber).collect(Collectors.toCollection(TreeSet::new))
+                : infrastructureService.listRooms(trimmed, "").stream()
+                        .filter(DormRoom::isActive)
+                        .map(DormRoom::getDormNumber)
+                        .collect(Collectors.toCollection(TreeSet::new));
+        int capacity = infrastructureService == null || !infrastructureService.hasInfrastructureData()
+                ? rooms.size() * DEFAULT_BEDS_PER_DORM
+                : infrastructureService.buildingCapacity(trimmed);
         return buildStatistics("楼栋", trimmed, matched, capacity);
     }
 
     public DormStatistics statisticsAll() {
-        Set<String> rooms = records.stream()
-                .map(StudentDormRecord::getDormNumber)
-                .collect(Collectors.toCollection(TreeSet::new));
-        int capacity = rooms.size() * DEFAULT_BEDS_PER_DORM;
+        Set<String> rooms = infrastructureService == null || !infrastructureService.hasInfrastructureData()
+                ? records.stream().map(StudentDormRecord::getDormNumber).collect(Collectors.toCollection(TreeSet::new))
+                : infrastructureService.activeDormNumbers();
+        int capacity = infrastructureService == null || !infrastructureService.hasInfrastructureData()
+                ? rooms.size() * DEFAULT_BEDS_PER_DORM
+                : infrastructureService.totalCapacity();
         return buildStatistics("全校", "全部宿舍", records, capacity);
     }
 
@@ -172,6 +209,29 @@ public class StudentDormService {
 
     public List<DormOccupancySummary> buildingOccupancySummaries(String buildingNumber) {
         String normalizedBuildingNumber = normalizeBuildingNumber(buildingNumber);
+        if (infrastructureService != null && infrastructureService.hasInfrastructureData()) {
+            Map<String, List<DormRoom>> roomsByBuilding = infrastructureService.activeRoomsByBuilding();
+            return roomsByBuilding.entrySet().stream()
+                    .filter(entry -> isBlank(normalizedBuildingNumber) || entry.getKey().equalsIgnoreCase(normalizedBuildingNumber))
+                    .sorted(Map.Entry.comparingByKey(this::compareNumbersAsText))
+                    .map(entry -> {
+                        Set<String> dormNumbers = entry.getValue().stream()
+                                .map(DormRoom::getDormNumber)
+                                .collect(Collectors.toCollection(TreeSet::new));
+                        int students = (int) records.stream()
+                                .filter(record -> dormNumbers.contains(record.getDormNumber()))
+                                .count();
+                        int capacity = entry.getValue().stream().mapToInt(DormRoom::getCapacity).sum();
+                        return new DormOccupancySummary(
+                                entry.getKey() + "号楼",
+                                entry.getKey(),
+                                "",
+                                entry.getValue().size(),
+                                students,
+                                capacity);
+                    })
+                    .collect(Collectors.toList());
+        }
         Map<String, List<StudentDormRecord>> byBuilding = records.stream()
                 .filter(record -> isBlank(normalizedBuildingNumber) || record.getBuildingNumber().equalsIgnoreCase(normalizedBuildingNumber))
                 .collect(Collectors.groupingBy(StudentDormRecord::getBuildingNumber, TreeMap::new, Collectors.toList()));
@@ -198,6 +258,23 @@ public class StudentDormService {
 
     public List<DormOccupancySummary> dormOccupancySummaries(String dormNumber) {
         String normalizedDormNumber = normalizeText(dormNumber);
+        if (infrastructureService != null && infrastructureService.hasInfrastructureData()) {
+            return infrastructureService.listRooms("", normalizedDormNumber).stream()
+                    .filter(DormRoom::isActive)
+                    .map(room -> {
+                        int students = (int) records.stream()
+                                .filter(record -> record.getDormNumber().equalsIgnoreCase(room.getDormNumber()))
+                                .count();
+                        return new DormOccupancySummary(
+                                room.getDormNumber(),
+                                room.getBuildingNumber(),
+                                room.getDormNumber(),
+                                1,
+                                students,
+                                room.getCapacity());
+                    })
+                    .collect(Collectors.toList());
+        }
         Map<String, List<StudentDormRecord>> byDorm = records.stream()
                 .filter(record -> isBlank(normalizedDormNumber)
                         || record.getDormNumber().equalsIgnoreCase(normalizedDormNumber)
@@ -231,6 +308,54 @@ public class StudentDormService {
         return new DormStatistics(scopeType, scopeValue, matched.size(), roomCount, capacity, vacantBeds, departmentCounts);
     }
 
+    private List<StudentDormRecord> filterRecords(StudentSearchCriteria criteria) {
+        String buildingNumber = normalizeBuildingNumber(criteria.getBuildingNumber());
+        String keyword = normalizeText(criteria.getKeyword()).toLowerCase(Locale.ROOT);
+        Comparator<StudentDormRecord> comparator = "department".equalsIgnoreCase(criteria.getSort())
+                || "departmentClass".equalsIgnoreCase(criteria.getSort())
+                ? Comparator.comparing(StudentDormRecord::getDepartment)
+                        .thenComparing(StudentDormRecord::getClassName)
+                        .thenComparing(StudentDormRecord::getStudentId)
+                : Comparator.comparing(StudentDormRecord::getDormNumber)
+                        .thenComparing(StudentDormRecord::getBedNumber);
+        return records.stream()
+                .filter(record -> isBlank(criteria.getStudentId()) || record.getStudentId().equalsIgnoreCase(criteria.getStudentId()))
+                .filter(record -> isBlank(criteria.getDormNumber()) || record.getDormNumber().equalsIgnoreCase(criteria.getDormNumber()))
+                .filter(record -> isBlank(buildingNumber) || record.getBuildingNumber().equalsIgnoreCase(buildingNumber))
+                .filter(record -> matchesText(record.getDepartment(), criteria.getDepartment()))
+                .filter(record -> matchesText(record.getClassName(), criteria.getClassName()))
+                .filter(record -> isBlank(keyword)
+                        || record.getStudentId().toLowerCase(Locale.ROOT).contains(keyword)
+                        || record.getName().toLowerCase(Locale.ROOT).contains(keyword)
+                        || record.getDepartment().toLowerCase(Locale.ROOT).contains(keyword)
+                        || record.getClassName().toLowerCase(Locale.ROOT).contains(keyword)
+                        || record.getDormNumber().toLowerCase(Locale.ROOT).contains(keyword))
+                .sorted(comparator)
+                .collect(Collectors.toList());
+    }
+
+    private void validateBedExists(String dormNumber, String bedNumber) {
+        if (infrastructureService == null || !infrastructureService.hasInfrastructureData()) {
+            return;
+        }
+        if (!infrastructureService.isRoomActive(dormNumber)) {
+            throw new IllegalArgumentException("目标宿舍不存在或已停用。");
+        }
+        if (!infrastructureService.isBedActive(dormNumber, bedNumber)) {
+            throw new IllegalArgumentException("目标床位不存在或已停用。");
+        }
+    }
+
+    private String resolveDormPhone(String dormNumber, String inputPhone) {
+        if (!isBlank(inputPhone)) {
+            return normalizeText(inputPhone);
+        }
+        if (infrastructureService == null || !infrastructureService.hasInfrastructureData()) {
+            return "";
+        }
+        return infrastructureService.roomPhone(dormNumber);
+    }
+
     private void validateRequired(StudentDormRecord record) {
         if (isBlank(record.getStudentId())
                 || isBlank(record.getName())
@@ -257,6 +382,9 @@ public class StudentDormService {
     }
 
     private String normalizeBuildingNumber(String value) {
+        if (infrastructureService != null) {
+            return infrastructureService.normalizeBuildingNumber(value);
+        }
         String normalized = normalizeText(value);
         if (normalized.endsWith("号楼")) {
             return normalized.substring(0, normalized.length() - 2).trim();

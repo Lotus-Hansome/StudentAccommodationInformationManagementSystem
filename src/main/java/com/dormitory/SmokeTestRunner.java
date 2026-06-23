@@ -38,10 +38,21 @@ public final class SmokeTestRunner {
         expectFailure(
                 () -> requestService.submit("T003", "9-103", "0571-9103", "1", "Second pending request"),
                 "duplicate pending request should be rejected");
+        expectFailure(
+                () -> requestService.submit("T002", "9-101", "0571-9101", "3", "Same target bed"),
+                "pending target bed should be locked");
+        expectFailure(
+                () -> requestService.approve(request.getId(), " "),
+                "blank approval comment should be rejected");
 
         requestService.approve(request.getId(), "Approved");
         StudentDormRecord updated = studentService.findByStudentId("T003").orElseThrow();
         require("9-101".equals(updated.getDormNumber()) && "3".equals(updated.getBedNumber()), "approved request should update dorm");
+
+        DormChangeRequest cancelRequest = requestService.submit("T001", "9-102", "0571-9102", "2", "Need a quiet room");
+        requestService.cancel(cancelRequest.getId(), "T001");
+        require(requestService.listByStudentId("T001").stream().anyMatch(item -> item.getStatus() == ChangeRequestStatus.CANCELED),
+                "student should be able to cancel a pending request");
 
         DormStatistics statistics = studentService.statisticsByBuilding("9");
         String analysis = new LocalRuleDormAnalyzer().analyze(statistics);

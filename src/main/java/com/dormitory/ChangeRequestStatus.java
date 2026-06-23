@@ -3,7 +3,8 @@ package com.dormitory;
 public enum ChangeRequestStatus {
     PENDING("待审核"),
     APPROVED("已同意"),
-    REJECTED("已拒绝");
+    REJECTED("已拒绝"),
+    CANCELED("已撤回");
 
     private final String displayName;
 
