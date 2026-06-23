@@ -14,7 +14,7 @@ import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 public class StudentDormService {
-    public static final int DEFAULT_BEDS_PER_DORM = 6;
+    public static final int DEFAULT_BEDS_PER_DORM = 4;
 
     private final StudentRepository repository;
     private final DormInfrastructureService infrastructureService;

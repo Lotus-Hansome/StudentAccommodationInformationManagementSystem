@@ -513,9 +513,9 @@ public class DormitoryWebServer {
                 form.getOrDefault("dormNumber", ""),
                 form.getOrDefault("buildingNumber", ""),
                 parseInt(form.get("floorNumber"), 1),
-                form.getOrDefault("roomType", "标准六人间"),
+                form.getOrDefault("roomType", "标准四人间"),
                 form.getOrDefault("genderType", "MIXED"),
-                parseInt(form.get("capacity"), 6),
+                parseInt(form.get("capacity"), 4),
                 form.getOrDefault("phone", ""),
                 form.getOrDefault("status", "ACTIVE"));
     }

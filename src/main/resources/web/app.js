@@ -542,8 +542,8 @@ async function saveRoom(event) {
   event.preventDefault();
   await api("/api/rooms", { method: "POST", body: new FormData(event.currentTarget) });
   event.currentTarget.reset();
-  event.currentTarget.roomType.value = "标准六人间";
-  event.currentTarget.capacity.value = 6;
+  event.currentTarget.roomType.value = "标准四人间";
+  event.currentTarget.capacity.value = 4;
   await loadRooms();
   toast("宿舍已保存");
 }

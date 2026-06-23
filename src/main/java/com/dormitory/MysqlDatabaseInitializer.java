@@ -39,9 +39,9 @@ public class MysqlDatabaseInitializer {
                         dorm_number VARCHAR(32) PRIMARY KEY,
                         building_number VARCHAR(32) NOT NULL,
                         floor_number INT NOT NULL,
-                        room_type VARCHAR(64) NOT NULL DEFAULT '标准六人间',
+                        room_type VARCHAR(64) NOT NULL DEFAULT '标准四人间',
                         gender_type VARCHAR(32) NOT NULL DEFAULT 'MIXED',
-                        capacity INT NOT NULL DEFAULT 6,
+                        capacity INT NOT NULL DEFAULT 4,
                         phone VARCHAR(32) NOT NULL,
                         status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -124,6 +124,7 @@ public class MysqlDatabaseInitializer {
                     """);
             seedDemoDataIfNeeded(connection);
             seedInfrastructureIfNeeded(connection);
+            migrateDefaultRoomsToFourIfNeeded(connection);
             seedUsersIfNeeded(connection);
         } catch (SQLException e) {
             throw new IllegalStateException("初始化 MySQL 表结构失败：" + e.getMessage(), e);
@@ -199,7 +200,7 @@ public class MysqlDatabaseInitializer {
     private void seedRooms(Connection connection) throws SQLException {
         String roomSql = """
                 INSERT INTO dorm_rooms (dorm_number, building_number, floor_number, room_type, gender_type, capacity, phone, status)
-                VALUES (?, ?, ?, '标准六人间', ?, 6, ?, 'ACTIVE')
+                VALUES (?, ?, ?, '标准四人间', ?, 4, ?, 'ACTIVE')
                 ON DUPLICATE KEY UPDATE
                   building_number = VALUES(building_number),
                   floor_number = VALUES(floor_number),
@@ -247,6 +248,55 @@ public class MysqlDatabaseInitializer {
                 }
             }
             insertStatement.executeBatch();
+        }
+    }
+
+    private void migrateDefaultRoomsToFourIfNeeded(Connection connection) throws SQLException {
+        String migrationAction = "MIGRATE_DEFAULT_ROOMS_TO_FOUR";
+        try (PreparedStatement checkStatement = connection.prepareStatement("SELECT COUNT(*) FROM operation_logs WHERE action = ?")) {
+            checkStatement.setString(1, migrationAction);
+            try (ResultSet resultSet = checkStatement.executeQuery()) {
+                resultSet.next();
+                if (resultSet.getInt(1) > 0) {
+                    return;
+                }
+            }
+        }
+
+        String updateSql = """
+                UPDATE dorm_rooms r
+                SET r.room_type = '标准四人间', r.capacity = 4
+                WHERE r.room_type = '标准六人间'
+                  AND r.capacity = 6
+                  AND (
+                    SELECT COUNT(*)
+                    FROM students s
+                    WHERE s.dorm_number = r.dorm_number
+                  ) <= 4
+                """;
+        int updatedRows;
+        try (Statement statement = connection.createStatement()) {
+            updatedRows = statement.executeUpdate(updateSql);
+            if (updatedRows > 0) {
+                statement.executeUpdate("""
+                        DELETE b
+                        FROM beds b
+                        JOIN dorm_rooms r ON r.dorm_number = b.dorm_number
+                        WHERE r.room_type = '标准四人间'
+                          AND r.capacity = 4
+                          AND CAST(b.bed_number AS UNSIGNED) > 4
+                        """);
+            }
+        }
+        if (updatedRows > 0) {
+            try (PreparedStatement logStatement = connection.prepareStatement("""
+                    INSERT INTO operation_logs (operator, action, target_type, target_id, detail)
+                    VALUES ('system', ?, 'dorm_rooms', 'default-capacity', ?)
+                    """)) {
+                logStatement.setString(1, migrationAction);
+                logStatement.setString(2, "已将默认标准六人间迁移为标准四人间，涉及宿舍数：" + updatedRows);
+                logStatement.executeUpdate();
+            }
         }
     }
 

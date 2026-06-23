@@ -27,7 +27,7 @@ public final class SmokeTestRunner {
         require(studentService.buildingOccupancySummaries("9").size() == 1, "filtered building occupancy summary failed");
         require(studentService.dormOccupancySummaries("9-101").size() == 1, "filtered dorm occupancy summary failed");
         DormOccupancySummary buildingSummary = studentService.buildingOccupancySummaries().get(0);
-        require(buildingSummary.getRoomCount() == 2 && buildingSummary.getTotalCapacity() == 12 && buildingSummary.getVacantBeds() == 9,
+        require(buildingSummary.getRoomCount() == 2 && buildingSummary.getTotalCapacity() == 8 && buildingSummary.getVacantBeds() == 5,
                 "building vacant bed calculation failed");
 
         expectFailure(
