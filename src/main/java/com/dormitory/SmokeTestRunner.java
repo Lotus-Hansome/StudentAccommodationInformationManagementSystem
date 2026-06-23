@@ -1,6 +1,9 @@
 package com.dormitory;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
 
 public final class SmokeTestRunner {
     private SmokeTestRunner() {
@@ -54,6 +57,20 @@ public final class SmokeTestRunner {
         require(requestService.listByStudentId("T001").stream().anyMatch(item -> item.getStatus() == ChangeRequestStatus.CANCELED),
                 "student should be able to cancel a pending request");
 
+        UserService userService = new UserService(new InMemoryUserRepository());
+        userService.create("admin2", "admin234", "ADMIN", "", true);
+        long enabledAdmins = userService.listAll().stream()
+                .filter(user -> user.getRole() == UserRole.ADMIN && user.isEnabled())
+                .count();
+        require(enabledAdmins == 2, "system should allow multiple administrators");
+        userService.update("admin", "USER", "T001", true, "admin");
+        expectFailure(
+                () -> userService.update("admin2", "USER", "T002", true, "admin2"),
+                "last enabled administrator should not be demoted");
+        expectFailure(
+                () -> userService.update("admin2", "ADMIN", "", false, "admin"),
+                "last enabled administrator should not be disabled");
+
         DormStatistics statistics = studentService.statisticsByBuilding("9");
         String analysis = new LocalRuleDormAnalyzer().analyze(statistics);
         require(analysis.contains("入住率"), "analysis should include occupancy rate");
@@ -66,6 +83,51 @@ public final class SmokeTestRunner {
     private static void require(boolean condition, String message) {
         if (!condition) {
             throw new IllegalStateException(message);
+        }
+    }
+
+    private static class InMemoryUserRepository implements UserRepository {
+        private final List<User> users = new ArrayList<>();
+
+        private InMemoryUserRepository() {
+            users.add(new User("admin", PasswordHasher.hash("admin123"), UserRole.ADMIN, "", true));
+        }
+
+        @Override
+        public Optional<User> findByUsername(String username) {
+            return users.stream()
+                    .filter(user -> user.getUsername().equalsIgnoreCase(username))
+                    .findFirst();
+        }
+
+        @Override
+        public List<User> listAll() {
+            return List.copyOf(users);
+        }
+
+        @Override
+        public void create(User user) {
+            users.add(user);
+        }
+
+        @Override
+        public void update(User user) {
+            users.removeIf(item -> item.getUsername().equalsIgnoreCase(user.getUsername()));
+            users.add(user);
+        }
+
+        @Override
+        public void updatePassword(String username, String passwordHash) {
+            findByUsername(username).ifPresent(user -> update(new User(
+                    user.getUsername(),
+                    passwordHash,
+                    user.getRole(),
+                    user.getStudentId(),
+                    user.isEnabled())));
+        }
+
+        @Override
+        public void updateLastLogin(String username) {
         }
     }
 

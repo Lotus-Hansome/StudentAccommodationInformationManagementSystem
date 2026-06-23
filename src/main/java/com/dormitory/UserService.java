@@ -59,6 +59,12 @@ public class UserService {
         try {
             User existing = repository.findByUsername(normalizedUsername)
                     .orElseThrow(() -> new IllegalArgumentException("用户不存在。"));
+            if (existing.getRole() == UserRole.ADMIN
+                    && existing.isEnabled()
+                    && (userRole != UserRole.ADMIN || !enabled)
+                    && !hasOtherEnabledAdmin(existing.getUsername())) {
+                throw new IllegalArgumentException("系统至少需要保留一个启用的管理员账号。");
+            }
             repository.update(new User(
                     existing.getUsername(),
                     existing.getPasswordHash(),
@@ -106,6 +112,13 @@ public class UserService {
 
     private UserRole parseRole(String role) {
         return "ADMIN".equalsIgnoreCase(normalizeText(role)) ? UserRole.ADMIN : UserRole.USER;
+    }
+
+    private boolean hasOtherEnabledAdmin(String username) throws IOException {
+        return repository.listAll().stream()
+                .anyMatch(user -> !user.getUsername().equalsIgnoreCase(username)
+                        && user.getRole() == UserRole.ADMIN
+                        && user.isEnabled());
     }
 
     private String normalizeText(String value) {
