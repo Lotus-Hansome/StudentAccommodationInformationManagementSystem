@@ -362,7 +362,6 @@ public class StudentDormService {
                 || isBlank(record.getDepartment())
                 || isBlank(record.getClassName())
                 || isBlank(record.getDormNumber())
-                || isBlank(record.getDormPhone())
                 || isBlank(record.getBedNumber())) {
             throw new IllegalArgumentException("学生宿舍信息字段不能为空。");
         }

@@ -53,7 +53,8 @@
             <button data-view="requests"><svg><use href="#icon-swap"></use></svg>调换申请</button>
             <button data-view="analytics" data-admin-only><svg><use href="#icon-chart"></use></svg>智能分析</button>
             <button data-view="occupancy" data-admin-only><svg><use href="#icon-search"></use></svg>床位明细</button>
-            <button data-view="infrastructure" data-admin-only><svg><use href="#icon-building"></use></svg>基础数据</button>
+            <button data-view="buildings" data-admin-only><svg><use href="#icon-building"></use></svg>楼栋管理</button>
+            <button data-view="rooms" data-admin-only><svg><use href="#icon-building"></use></svg>宿舍管理</button>
             <button data-view="users" data-admin-only><svg><use href="#icon-key"></use></svg>账号管理</button>
             <button data-view="audit" data-admin-only><svg><use href="#icon-log"></use></svg>操作日志</button>
             <button data-view="settings" data-admin-only><svg><use href="#icon-settings"></use></svg>系统设置</button>
@@ -129,7 +130,6 @@
                         <label><span>所在系</span><input name="department" required></label>
                         <label><span>班级</span><input name="className" required></label>
                         <label><span>宿舍号</span><input name="dormNumber" required></label>
-                        <label><span>宿舍电话</span><input name="dormPhone" required></label>
                         <label><span>床位</span><input name="bedNumber" required></label>
                         <div class="form-actions">
                             <button type="button" id="resetStudentForm" class="btn">重置</button>
@@ -215,42 +215,43 @@
             </section>
         </section>
 
-        <section id="infrastructureView" class="view">
-            <div class="split-grid">
-                <section class="panel">
-                    <div class="panel-head">
-                        <h3>楼栋管理</h3>
-                        <div class="toolbar"><input id="buildingKeyword" placeholder="楼栋"><button id="searchBuildingsButton" class="btn"><svg><use href="#icon-search"></use></svg>查询</button></div>
-                    </div>
-                    <form id="buildingForm" class="form-grid inline-form">
-                        <input name="buildingNumber" placeholder="楼栋号" required>
-                        <input name="buildingName" placeholder="楼栋名称" required>
-                        <select name="genderType"><option value="MALE">男生</option><option value="FEMALE">女生</option><option value="MIXED">混合</option></select>
-                        <input name="totalFloors" type="number" min="1" value="6" required>
-                        <select name="status"><option value="ACTIVE">启用</option><option value="DISABLED">停用</option></select>
-                        <button class="btn primary" type="submit"><svg><use href="#icon-save"></use></svg>保存</button>
-                    </form>
-                    <div class="table-wrap"><table><thead><tr><th>楼栋号</th><th>名称</th><th>类型</th><th>楼层</th><th>状态</th><th>操作</th></tr></thead><tbody id="buildingsTable"></tbody></table></div>
-                </section>
-                <section class="panel">
-                    <div class="panel-head">
-                        <h3>宿舍管理</h3>
-                        <div class="toolbar"><input id="roomBuildingQuery" placeholder="楼栋"><input id="roomKeyword" placeholder="宿舍"><button id="searchRoomsButton" class="btn"><svg><use href="#icon-search"></use></svg>查询</button></div>
-                    </div>
-                    <form id="roomForm" class="form-grid inline-form">
-                        <input name="dormNumber" placeholder="宿舍号" required>
-                        <input name="buildingNumber" placeholder="楼栋号" required>
-                        <input name="floorNumber" type="number" min="1" placeholder="楼层" required>
-                        <input name="roomType" placeholder="房型" value="标准四人间" required>
-                        <select name="genderType"><option value="MALE">男生</option><option value="FEMALE">女生</option><option value="MIXED">混合</option></select>
-                        <input name="capacity" type="number" min="1" max="8" value="4" required>
-                        <input name="phone" placeholder="电话" required>
-                        <select name="status"><option value="ACTIVE">启用</option><option value="DISABLED">停用</option></select>
-                        <button class="btn primary" type="submit"><svg><use href="#icon-save"></use></svg>保存</button>
-                    </form>
-                    <div class="table-wrap"><table><thead><tr><th>宿舍</th><th>楼栋</th><th>楼层</th><th>容量</th><th>电话</th><th>状态</th><th>操作</th></tr></thead><tbody id="roomsTable"></tbody></table></div>
-                </section>
-            </div>
+        <section id="buildingsView" class="view">
+            <section class="panel">
+                <div class="panel-head">
+                    <h3>楼栋管理</h3>
+                    <div class="toolbar"><input id="buildingKeyword" placeholder="楼栋"><button id="searchBuildingsButton" class="btn"><svg><use href="#icon-search"></use></svg>查询</button></div>
+                </div>
+                <form id="buildingForm" class="form-grid inline-form">
+                    <input name="buildingNumber" placeholder="楼栋号" required>
+                    <input name="buildingName" placeholder="楼栋名称" required>
+                    <select name="genderType"><option value="MALE">男生</option><option value="FEMALE">女生</option><option value="MIXED">混合</option></select>
+                    <input name="totalFloors" type="number" min="1" value="6" required>
+                    <select name="status"><option value="ACTIVE">启用</option><option value="DISABLED">停用</option></select>
+                    <button class="btn primary" type="submit"><svg><use href="#icon-save"></use></svg>保存</button>
+                </form>
+                <div class="table-wrap"><table><thead><tr><th>楼栋号</th><th>名称</th><th>类型</th><th>楼层</th><th>状态</th><th>操作</th></tr></thead><tbody id="buildingsTable"></tbody></table></div>
+            </section>
+        </section>
+
+        <section id="roomsView" class="view">
+            <section class="panel">
+                <div class="panel-head">
+                    <h3>宿舍管理</h3>
+                    <div class="toolbar"><input id="roomBuildingQuery" placeholder="楼栋"><input id="roomKeyword" placeholder="宿舍"><button id="searchRoomsButton" class="btn"><svg><use href="#icon-search"></use></svg>查询</button></div>
+                </div>
+                <form id="roomForm" class="form-grid inline-form">
+                    <input name="dormNumber" placeholder="宿舍号" required>
+                    <input name="buildingNumber" placeholder="楼栋号" required>
+                    <input name="floorNumber" type="number" min="1" placeholder="楼层" required>
+                    <input name="roomType" placeholder="房型" value="标准四人间" required>
+                    <select name="genderType"><option value="MALE">男生</option><option value="FEMALE">女生</option><option value="MIXED">混合</option></select>
+                    <input name="capacity" type="number" min="1" max="8" value="4" required>
+                    <input name="phone" placeholder="电话" required>
+                    <select name="status"><option value="ACTIVE">启用</option><option value="DISABLED">停用</option></select>
+                    <button class="btn primary" type="submit"><svg><use href="#icon-save"></use></svg>保存</button>
+                </form>
+                <div class="table-wrap"><table><thead><tr><th>宿舍</th><th>楼栋</th><th>楼层</th><th>容量</th><th>电话</th><th>状态</th><th>操作</th></tr></thead><tbody id="roomsTable"></tbody></table></div>
+            </section>
         </section>
 
         <section id="usersView" class="view">

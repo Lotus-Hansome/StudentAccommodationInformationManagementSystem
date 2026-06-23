@@ -37,13 +37,14 @@ const titles = {
   requests: ["调换申请", "提交、查看、撤回与审核宿舍调换申请"],
   analytics: ["智能分析", "按楼栋或宿舍生成运营评估与建议"],
   occupancy: ["床位明细", "查询每栋楼和每个宿舍的入住、容量与空余床位"],
-  infrastructure: ["基础数据", "维护楼栋、宿舍、床位容量、类型和启停状态"],
+  buildings: ["楼栋管理", "维护楼栋名称、住宿类型、楼层和启停状态"],
+  rooms: ["宿舍管理", "维护宿舍所属楼栋、楼层、房型、容量和启停状态"],
   users: ["账号管理", "维护管理员和学生账号，支持禁用、绑定学号与密码重置"],
   audit: ["操作日志", "查看关键业务操作的审计记录"],
   settings: ["系统设置", "配置智能分析模型服务和运行参数"],
 };
 
-const adminViews = ["analytics", "occupancy", "infrastructure", "users", "audit", "settings"];
+const adminViews = ["analytics", "occupancy", "buildings", "rooms", "users", "audit", "settings"];
 
 document.addEventListener("DOMContentLoaded", () => {
   $("#loginForm").addEventListener("submit", login);
@@ -167,7 +168,8 @@ function navigate(view) {
     updateOccupancyPlaceholder();
     loadOccupancyDetails($("#occupancyScope").value, $("#occupancyQuery").value.trim());
   }
-  if (view === "infrastructure") loadInfrastructure();
+  if (view === "buildings") loadBuildings();
+  if (view === "rooms") loadRooms();
   if (view === "users") loadUsers();
   if (view === "audit") loadAuditLogs(1);
   if (view === "settings") loadModelConfig();
@@ -267,7 +269,6 @@ function editStudent(studentId) {
   form.department.value = student.department;
   form.className.value = student.className;
   form.dormNumber.value = student.dormNumber;
-  form.dormPhone.value = student.dormPhone;
   form.bedNumber.value = student.bedNumber;
   $("#studentFormTitle").textContent = "编辑住宿信息";
 }
@@ -277,10 +278,11 @@ async function saveStudent(event) {
   const form = event.currentTarget;
   const method = form.mode.value === "edit" ? "PUT" : "POST";
   await api("/api/students", { method, body: new FormData(form) });
+  const message = method === "PUT" ? "住宿信息修改成功" : "住宿信息添加成功";
   resetStudentForm();
   await reloadStudents();
   await loadOverview();
-  toast("住宿信息已保存");
+  toast(message);
 }
 
 function resetStudentForm() {
@@ -446,10 +448,6 @@ function renderOccupancyDetails(items) {
   `).join("");
 }
 
-async function loadInfrastructure() {
-  await Promise.all([loadBuildings(), loadRooms()]);
-}
-
 async function loadBuildings() {
   const query = new URLSearchParams({ keyword: $("#buildingKeyword").value.trim() });
   const data = await api(`/api/buildings?${query.toString()}`);
@@ -484,15 +482,18 @@ function editBuilding(buildingNumber) {
   form.genderType.value = building.genderType;
   form.totalFloors.value = building.totalFloors;
   form.status.value = building.status;
+  form.dataset.editing = "true";
 }
 
 async function saveBuilding(event) {
   event.preventDefault();
   await api("/api/buildings", { method: "POST", body: new FormData(event.currentTarget) });
+  const editing = event.currentTarget.dataset.editing === "true";
   event.currentTarget.reset();
+  event.currentTarget.dataset.editing = "";
   event.currentTarget.totalFloors.value = 6;
   await loadBuildings();
-  toast("楼栋已保存");
+  toast(editing ? "楼栋信息修改成功" : "楼栋信息保存成功");
 }
 
 async function loadRooms() {
@@ -536,16 +537,19 @@ function editRoom(dormNumber) {
   form.capacity.value = room.capacity;
   form.phone.value = room.phone;
   form.status.value = room.status;
+  form.dataset.editing = "true";
 }
 
 async function saveRoom(event) {
   event.preventDefault();
   await api("/api/rooms", { method: "POST", body: new FormData(event.currentTarget) });
+  const editing = event.currentTarget.dataset.editing === "true";
   event.currentTarget.reset();
+  event.currentTarget.dataset.editing = "";
   event.currentTarget.roomType.value = "标准四人间";
   event.currentTarget.capacity.value = 4;
   await loadRooms();
-  toast("宿舍已保存");
+  toast(editing ? "宿舍信息修改成功" : "宿舍信息保存成功");
 }
 
 async function loadUsers() {
