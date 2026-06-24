@@ -18,6 +18,6 @@ public class DormAnalysisService {
             }
         }
         return localAnalyzer.analyze(statistics)
-                + "\n当前为本地分析模式。如需启用大模型生成更完整的运营建议，请由管理员在部署环境中配置模型服务。";
+                + "\n当前为本地规则分析模式。如需启用大模型生成更完整的运营建议，请由管理员在系统设置中选择一个模型配置。";
     }
 }

@@ -367,6 +367,41 @@ svg {
     font-size: 16px;
 }
 
+.model-settings-panel {
+    display: grid;
+    gap: 14px;
+}
+
+.settings-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+}
+
+.settings-head h3 {
+    margin: 0;
+    font-size: 18px;
+}
+
+.settings-head p {
+    margin: 6px 0 0;
+    color: var(--muted);
+}
+
+.settings-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.model-config-list {
+    display: grid;
+    gap: 12px;
+}
+
 .model-provider-card {
     overflow: hidden;
     border: 1px solid var(--line);
@@ -490,11 +525,13 @@ svg {
     padding: 18px 20px 20px;
     border-top: 1px solid var(--line-soft);
     background: #f8fbff;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
 }
 
 .model-form-grid {
     display: grid;
-    grid-template-columns: minmax(260px, 1.2fr) minmax(180px, 0.8fr) minmax(220px, 1fr);
+    grid-template-columns: minmax(160px, 0.75fr) minmax(260px, 1.25fr) minmax(180px, 0.75fr) minmax(220px, 1fr);
     gap: 14px;
 }
 
@@ -862,6 +899,15 @@ code {
     .model-provider-row {
         align-items: flex-start;
         flex-wrap: wrap;
+    }
+
+    .settings-head {
+        flex-direction: column;
+    }
+
+    .settings-actions {
+        justify-content: flex-start;
+        width: 100%;
     }
 
     .provider-actions {

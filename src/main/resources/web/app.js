@@ -86,10 +86,9 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#modelConfigForm").addEventListener("submit", saveModelConfig);
   $("#reloadModelConfigButton").addEventListener("click", loadModelConfig);
   $("#clearModelConfigButton").addEventListener("click", clearModelConfig);
-  $("#enableModelConfigButton").addEventListener("click", enableModelConfig);
-  $("#toggleModelConfigButton").addEventListener("click", () => setModelEditorVisible(true));
+  $("#addModelConfigButton").addEventListener("click", () => openModelConfigForm());
   $("#cancelModelEditButton").addEventListener("click", () => setModelEditorVisible(false));
-  $("#copyModelUrlButton").addEventListener("click", copyModelConfigUrl);
+  $("#modelConfigList").addEventListener("click", handleModelConfigAction);
 });
 
 async function login(event) {
@@ -664,68 +663,147 @@ function renderAuditLogs() {
 
 async function loadModelConfig() {
   const data = await api("/api/model-config");
-  const form = $("#modelConfigForm");
-  form.apiUrl.value = data.apiUrl || "";
-  form.model.value = data.model || "";
-  form.apiKey.value = "";
-  form.apiKey.placeholder = "";
   updateModelConfigStatus(data);
-  setModelEditorVisible(!data.configured);
 }
 
 async function saveModelConfig(event) {
   event.preventDefault();
-  const data = await api("/api/model-config", { method: "POST", body: new FormData(event.currentTarget) });
-  event.currentTarget.apiKey.value = "";
+  const body = new FormData(event.currentTarget);
+  body.set("action", "save");
+  const data = await api("/api/model-config", { method: "POST", body });
+  event.currentTarget.reset();
+  setModelEditorVisible(false);
   updateModelConfigStatus(data);
-  toast(data.configured ? "模型服务配置已保存" : "配置已保存，但仍缺少接口地址、模型名或 API Key");
-  await loadModelConfig();
+  toast("模型服务配置已保存，可在列表中选择启用");
 }
 
 async function clearModelConfig() {
-  if (!confirm("确定取消模型服务本地配置吗？")) return;
+  if (!confirm("确定清空全部模型服务配置吗？")) return;
   const data = await api("/api/model-config", { method: "DELETE" });
   updateModelConfigStatus(data);
-  await loadModelConfig();
-  toast(data.environmentConfigured ? "本地配置已取消，当前使用环境变量配置" : "模型服务配置已取消");
+  setModelEditorVisible(false);
+  toast("模型服务配置已清空，当前使用本地规则分析");
 }
 
-function enableModelConfig() {
-  const form = $("#modelConfigForm");
-  const hasApiUrl = form.apiUrl.value.trim();
-  const hasModel = form.model.value.trim();
-  const hasApiKey = form.apiKey.value.trim() || (state.modelConfig && state.modelConfig.apiKeySet);
-  if (!hasApiUrl || !hasModel || !hasApiKey) {
-    setModelEditorVisible(true);
-    toast("请先填写接口地址、模型名称和 API Key");
-    return;
+async function handleModelConfigAction(event) {
+  const button = event.target.closest("button[data-action]");
+  if (!button) return;
+  const action = button.dataset.action;
+  const id = button.dataset.id || "";
+  if (action === "select") {
+    await selectModelConfig(id);
+  } else if (action === "edit") {
+    openModelConfigForm(modelConfigById(id));
+  } else if (action === "copy") {
+    await copyModelConfigUrl(modelConfigById(id));
+  } else if (action === "delete") {
+    await deleteModelConfig(id);
   }
-  form.requestSubmit();
+}
+
+async function selectModelConfig(id) {
+  const body = new FormData();
+  body.set("action", "select");
+  body.set("id", id || "local");
+  const data = await api("/api/model-config", { method: "POST", body });
+  updateModelConfigStatus(data);
+  toast(id === "local" ? "已切换为本地规则分析" : "模型配置已启用");
+}
+
+async function deleteModelConfig(id) {
+  const profile = modelConfigById(id);
+  if (!profile) return;
+  if (!confirm(`确定删除配置 ${profile.name} 吗？`)) return;
+  const query = new URLSearchParams({ id });
+  const data = await api(`/api/model-config?${query.toString()}`, { method: "DELETE" });
+  updateModelConfigStatus(data);
+  toast("模型配置已删除");
 }
 
 function updateModelConfigStatus(data) {
   state.modelConfig = data;
-  const provider = inferModelProvider(data.apiUrl, data.model);
-  $("#modelProviderName").textContent = provider.name;
-  $("#modelProviderMark").textContent = provider.mark;
-  $("#modelConfigUrl").textContent = data.apiUrl || "未填写接口地址";
-  $("#modelConfigModel").textContent = `模型：${data.model || "未设置"}`;
-  $("#modelConfigKeyStatus").textContent = `API Key：${data.apiKeySet ? "已保存" : "未设置"}`;
-  $("#modelProviderCard").classList.toggle("configured", data.configured);
   const status = $("#modelConfigStatus");
-  status.textContent = data.configured ? `已配置 · ${data.sourceText}` : data.environmentConfigured ? "本地未配置 · 环境变量可用" : "未配置";
-  status.className = `status ${data.configured ? "approved" : "pending"}`;
+  status.textContent = data.localAnalysis ? "本地规则分析" : data.configured ? `已启用 · ${data.sourceText}` : "未启用模型";
+  status.className = `status ${data.configured || data.localAnalysis ? "approved" : "pending"}`;
   const clearButton = $("#clearModelConfigButton");
-  clearButton.disabled = !data.localConfigPresent;
-  clearButton.title = data.localConfigPresent ? "" : "当前没有本地配置";
+  clearButton.disabled = !data.configs || data.configs.length === 0;
+  clearButton.title = clearButton.disabled ? "当前没有模型配置" : "清空全部配置";
+  renderModelConfigList(data);
 }
 
 function setModelEditorVisible(visible) {
   $("#modelConfigForm").classList.toggle("hidden", !visible);
 }
 
-async function copyModelConfigUrl() {
-  const url = (state.modelConfig && state.modelConfig.apiUrl) || $("#modelConfigForm").apiUrl.value.trim();
+function openModelConfigForm(profile = null) {
+  const form = $("#modelConfigForm");
+  form.reset();
+  form.id.value = profile ? profile.id : "";
+  form.name.value = profile ? profile.name : "";
+  form.apiUrl.value = profile ? profile.apiUrl : "";
+  form.model.value = profile ? profile.model : "";
+  form.apiKey.placeholder = profile && profile.apiKeySet ? "已保存，留空则不修改" : "";
+  setModelEditorVisible(true);
+}
+
+function renderModelConfigList(data) {
+  const list = $("#modelConfigList");
+  const localActive = !!data.localAnalysis;
+  const localCard = modelConfigCardHtml({
+    id: "local",
+    name: "本地规则分析",
+    apiUrl: "不调用外部大模型接口",
+    model: "基于系统统计规则生成建议",
+    apiKeySet: false,
+    configured: true,
+    active: localActive,
+    local: true,
+  });
+  const configCards = (data.configs || []).map(modelConfigCardHtml).join("");
+  list.innerHTML = localCard + configCards;
+}
+
+function modelConfigCardHtml(profile) {
+  const provider = profile.local ? { name: profile.name, mark: "LOCAL" } : inferModelProvider(profile.apiUrl, profile.model, profile.name);
+  const activeClass = profile.active ? " configured" : "";
+  const disabledSelect = !profile.local && !profile.configured ? "disabled" : "";
+  const selectText = profile.active ? "已启用" : profile.local ? "使用本地" : "启用";
+  const meta = profile.local
+    ? "无需 API Key"
+    : `模型：${escapeHtml(profile.model || "未设置")} · API Key：${profile.apiKeySet ? "已保存" : "未设置"}`;
+  const actions = profile.local ? `
+      <button type="button" class="btn ${profile.active ? "" : "primary"} enable-btn" data-action="select" data-id="local" ${profile.active ? "disabled" : ""}><svg><use href="#icon-play"></use></svg>${selectText}</button>
+    ` : `
+      <button type="button" class="btn ${profile.active ? "" : "primary"} enable-btn" data-action="select" data-id="${escapeHtml(profile.id)}" ${profile.active || disabledSelect ? "disabled" : ""}><svg><use href="#icon-play"></use></svg>${selectText}</button>
+      <button type="button" class="icon-btn" data-action="edit" data-id="${escapeHtml(profile.id)}" title="编辑配置"><svg><use href="#icon-edit"></use></svg></button>
+      <button type="button" class="icon-btn" data-action="copy" data-id="${escapeHtml(profile.id)}" title="复制接口地址"><svg><use href="#icon-copy"></use></svg></button>
+      <button type="button" class="icon-btn danger" data-action="delete" data-id="${escapeHtml(profile.id)}" title="删除配置"><svg><use href="#icon-trash"></use></svg></button>
+    `;
+  return `
+    <article class="model-provider-card${activeClass}">
+      <div class="model-provider-row">
+        <div class="provider-grip" aria-hidden="true"></div>
+        <div class="provider-logo">${escapeHtml(provider.mark)}</div>
+        <div class="provider-main">
+          <div class="provider-title-row">
+            <h3>${escapeHtml(profile.name || provider.name)}</h3>
+            <span class="status ${profile.active ? "approved" : profile.configured ? "pending" : "rejected"}">${profile.active ? "当前使用" : profile.configured ? "可启用" : "未完整"}</span>
+          </div>
+          <div class="provider-url">${escapeHtml(profile.apiUrl || "未填写接口地址")}</div>
+          <div class="provider-meta"><span>${meta}</span></div>
+        </div>
+        <div class="provider-actions">${actions}</div>
+      </div>
+    </article>
+  `;
+}
+
+function modelConfigById(id) {
+  return ((state.modelConfig && state.modelConfig.configs) || []).find((profile) => profile.id === id);
+}
+
+async function copyModelConfigUrl(profile) {
+  const url = profile ? profile.apiUrl : "";
   if (!url) return toast("暂无接口地址可复制");
   try {
     await navigator.clipboard.writeText(url);
@@ -735,13 +813,13 @@ async function copyModelConfigUrl() {
   }
 }
 
-function inferModelProvider(apiUrl, model) {
+function inferModelProvider(apiUrl, model, fallbackName = "") {
   const text = `${apiUrl || ""} ${model || ""}`.toLowerCase();
   if (text.includes("deepseek")) return { name: "DeepSeek Compatible", mark: "DS" };
   if (text.includes("openai")) return { name: "OpenAI Official", mark: "AI" };
   if (text.includes("siliconflow")) return { name: "SiliconFlow", mark: "SF" };
   if (text.includes("dashscope") || text.includes("aliyuncs")) return { name: "DashScope Compatible", mark: "DB" };
-  return { name: "OpenAI 兼容模型服务", mark: "LLM" };
+  return { name: fallbackName || "OpenAI 兼容模型服务", mark: "LLM" };
 }
 
 function openPasswordDialog() {

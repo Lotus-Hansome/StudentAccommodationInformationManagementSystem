@@ -473,23 +473,37 @@ public class DormitoryWebServer {
 
     private void modelConfig(HttpExchange exchange, String method, User admin) throws IOException {
         if ("GET".equalsIgnoreCase(method)) {
-            sendJson(exchange, 200, modelConfigJson(modelConfigService.loadStatusConfig()));
+            sendJson(exchange, 200, modelConfigJson(modelConfigService.loadStatus()));
             return;
         }
         if ("POST".equalsIgnoreCase(method)) {
             Map<String, String> form = readForm(exchange);
-            ModelServiceConfig config = modelConfigService.saveLocalConfig(
-                    form.getOrDefault("apiUrl", ""),
-                    form.getOrDefault("apiKey", ""),
-                    form.getOrDefault("model", ""));
-            operationLogService.record(admin.getUsername(), "SAVE_MODEL_CONFIG", "system_config", "model_service", "保存模型服务本地配置");
-            sendJson(exchange, 200, modelConfigJson(config));
+            String action = form.getOrDefault("action", "save");
+            ModelConfigStatus status;
+            if ("select".equals(action)) {
+                status = modelConfigService.selectConfig(form.getOrDefault("id", "local"));
+                operationLogService.record(admin.getUsername(), "SELECT_MODEL_CONFIG", "system_config", "model_service", "选择模型服务配置：" + form.getOrDefault("id", "local"));
+            } else {
+                status = modelConfigService.saveLocalConfig(
+                        form.getOrDefault("id", ""),
+                        form.getOrDefault("name", ""),
+                        form.getOrDefault("apiUrl", ""),
+                        form.getOrDefault("apiKey", ""),
+                        form.getOrDefault("model", ""),
+                        "true".equalsIgnoreCase(form.getOrDefault("activate", "false")));
+                operationLogService.record(admin.getUsername(), "SAVE_MODEL_CONFIG", "system_config", "model_service", "保存模型服务本地配置");
+            }
+            sendJson(exchange, 200, modelConfigJson(status));
             return;
         }
         if ("DELETE".equalsIgnoreCase(method)) {
-            ModelServiceConfig config = modelConfigService.clearLocalConfig();
-            operationLogService.record(admin.getUsername(), "CLEAR_MODEL_CONFIG", "system_config", "model_service", "取消模型服务本地配置");
-            sendJson(exchange, 200, modelConfigJson(config));
+            Map<String, String> query = parseQuery(exchange.getRequestURI().getRawQuery());
+            String id = query.getOrDefault("id", "");
+            ModelConfigStatus status = id.isBlank()
+                    ? modelConfigService.clearLocalConfig()
+                    : modelConfigService.deleteLocalConfig(id);
+            operationLogService.record(admin.getUsername(), "DELETE_MODEL_CONFIG", "system_config", "model_service", id.isBlank() ? "清空模型服务本地配置" : "删除模型服务配置：" + id);
+            sendJson(exchange, 200, modelConfigJson(status));
             return;
         }
         throw new ApiException(405, "请求方法不支持。");
@@ -718,21 +732,60 @@ public class DormitoryWebServer {
         return builder.toString();
     }
 
-    private String modelConfigJson(ModelServiceConfig config) {
-        String sourceText = "environment".equals(config.getSource()) ? "环境变量" : "本地配置文件";
+    private String modelConfigJson(ModelConfigStatus status) {
+        ModelServiceConfig config = status.getEffectiveConfig();
         return "{"
                 + WebJson.booleanProperty("success", true) + ","
                 + WebJson.booleanProperty("configured", config.isConfigured()) + ","
                 + WebJson.booleanProperty("apiKeySet", config.hasApiKey()) + ","
-                + WebJson.booleanProperty("localConfigPresent", modelConfigService.hasLocalConfigFile()) + ","
-                + WebJson.booleanProperty("localConfigured", modelConfigService.isLocalConfigured()) + ","
-                + WebJson.booleanProperty("environmentConfigured", modelConfigService.isEnvironmentConfigured()) + ","
+                + WebJson.booleanProperty("localConfigPresent", status.isLocalConfigPresent()) + ","
+                + WebJson.booleanProperty("localConfigured", status.getProfiles().stream().anyMatch(ModelConfigProfile::isConfigured)) + ","
+                + WebJson.booleanProperty("localAnalysis", status.isLocalAnalysisSelected()) + ","
+                + WebJson.booleanProperty("environmentConfigured", status.isEnvironmentConfigured()) + ","
+                + WebJson.property("activeId", status.getActiveId()) + ","
                 + WebJson.property("apiUrl", config.getApiUrl()) + ","
                 + WebJson.property("model", config.getModel()) + ","
                 + WebJson.property("apiKeyMasked", config.maskedApiKey()) + ","
                 + WebJson.property("source", config.getSource()) + ","
-                + WebJson.property("sourceText", sourceText)
+                + WebJson.property("sourceText", modelConfigSourceText(status, config)) + ","
+                + "\"configs\":" + modelProfilesJson(status)
                 + "}";
+    }
+
+    private String modelProfilesJson(ModelConfigStatus status) {
+        StringBuilder builder = new StringBuilder("[");
+        List<ModelConfigProfile> profiles = status.getProfiles();
+        for (int i = 0; i < profiles.size(); i++) {
+            ModelConfigProfile profile = profiles.get(i);
+            if (i > 0) {
+                builder.append(',');
+            }
+            builder.append('{')
+                    .append(WebJson.property("id", profile.getId())).append(',')
+                    .append(WebJson.property("name", profile.getName())).append(',')
+                    .append(WebJson.property("apiUrl", profile.getApiUrl())).append(',')
+                    .append(WebJson.property("model", profile.getModel())).append(',')
+                    .append(WebJson.booleanProperty("apiKeySet", profile.hasApiKey())).append(',')
+                    .append(WebJson.property("apiKeyMasked", profile.maskedApiKey())).append(',')
+                    .append(WebJson.booleanProperty("configured", profile.isConfigured())).append(',')
+                    .append(WebJson.booleanProperty("active", !status.isLocalAnalysisSelected() && profile.getId().equals(status.getActiveId())))
+                    .append('}');
+        }
+        builder.append(']');
+        return builder.toString();
+    }
+
+    private String modelConfigSourceText(ModelConfigStatus status, ModelServiceConfig config) {
+        if (status.isLocalAnalysisSelected()) {
+            return "本地规则分析";
+        }
+        if ("environment".equals(config.getSource())) {
+            return "环境变量";
+        }
+        if ("local_file".equals(config.getSource())) {
+            return "本地配置文件";
+        }
+        return "本地规则分析";
     }
 
     private String pageJson(PageResult<?> page) {
