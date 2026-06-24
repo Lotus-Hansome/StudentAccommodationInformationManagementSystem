@@ -416,6 +416,16 @@ svg {
     color: var(--success);
 }
 
+.btn:disabled,
+.btn.primary:disabled,
+.btn.danger:disabled,
+.btn.success:disabled {
+    cursor: not-allowed;
+    border-color: var(--line);
+    background: #f5f7fa;
+    color: #a7b0bd;
+}
+
 .btn.ghost {
     color: #fff;
     border-color: rgba(255, 255, 255, 0.28);

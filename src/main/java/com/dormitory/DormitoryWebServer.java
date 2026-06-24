@@ -169,8 +169,8 @@ public class DormitoryWebServer {
             return;
         }
         if ("/api/model-config".equals(path)) {
-            requireAdmin(exchange);
-            modelConfig(exchange, method);
+            User admin = requireAdmin(exchange);
+            modelConfig(exchange, method, admin);
             return;
         }
         throw new ApiException(404, "接口不存在。");
@@ -471,7 +471,7 @@ public class DormitoryWebServer {
                 + "}");
     }
 
-    private void modelConfig(HttpExchange exchange, String method) throws IOException {
+    private void modelConfig(HttpExchange exchange, String method, User admin) throws IOException {
         if ("GET".equalsIgnoreCase(method)) {
             sendJson(exchange, 200, modelConfigJson(modelConfigService.loadStatusConfig()));
             return;
@@ -482,6 +482,13 @@ public class DormitoryWebServer {
                     form.getOrDefault("apiUrl", ""),
                     form.getOrDefault("apiKey", ""),
                     form.getOrDefault("model", ""));
+            operationLogService.record(admin.getUsername(), "SAVE_MODEL_CONFIG", "system_config", "model_service", "保存模型服务本地配置");
+            sendJson(exchange, 200, modelConfigJson(config));
+            return;
+        }
+        if ("DELETE".equalsIgnoreCase(method)) {
+            ModelServiceConfig config = modelConfigService.clearLocalConfig();
+            operationLogService.record(admin.getUsername(), "CLEAR_MODEL_CONFIG", "system_config", "model_service", "取消模型服务本地配置");
             sendJson(exchange, 200, modelConfigJson(config));
             return;
         }
@@ -717,6 +724,9 @@ public class DormitoryWebServer {
                 + WebJson.booleanProperty("success", true) + ","
                 + WebJson.booleanProperty("configured", config.isConfigured()) + ","
                 + WebJson.booleanProperty("apiKeySet", config.hasApiKey()) + ","
+                + WebJson.booleanProperty("localConfigPresent", modelConfigService.hasLocalConfigFile()) + ","
+                + WebJson.booleanProperty("localConfigured", modelConfigService.isLocalConfigured()) + ","
+                + WebJson.booleanProperty("environmentConfigured", modelConfigService.isEnvironmentConfigured()) + ","
                 + WebJson.property("apiUrl", config.getApiUrl()) + ","
                 + WebJson.property("model", config.getModel()) + ","
                 + WebJson.property("apiKeyMasked", config.maskedApiKey()) + ","

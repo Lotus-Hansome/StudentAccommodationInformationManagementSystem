@@ -11,19 +11,24 @@ public class ModelConfigService {
     private static final Path CONFIG_PATH = Path.of("config", "model.properties");
 
     public ModelServiceConfig loadEffectiveConfig() {
-        ModelServiceConfig environmentConfig = loadEnvironmentConfig();
-        if (environmentConfig.isConfigured()) {
-            return environmentConfig;
+        ModelServiceConfig fileConfig = loadFileConfig();
+        if (fileConfig.isConfigured()) {
+            return fileConfig;
         }
-        return loadFileConfig();
+        ModelServiceConfig environmentConfig = loadEnvironmentConfig();
+        return environmentConfig.isConfigured() ? environmentConfig : fileConfig;
     }
 
     public ModelServiceConfig loadStatusConfig() {
+        ModelServiceConfig fileConfig = loadFileConfig();
+        if (hasLocalConfigFile() || fileConfig.isConfigured()) {
+            return fileConfig;
+        }
         ModelServiceConfig environmentConfig = loadEnvironmentConfig();
         if (environmentConfig.isConfigured()) {
             return environmentConfig;
         }
-        return loadFileConfig();
+        return fileConfig;
     }
 
     public ModelServiceConfig saveLocalConfig(String apiUrl, String apiKey, String model) {
@@ -43,6 +48,27 @@ public class ModelConfigService {
             throw new IllegalStateException("保存模型服务配置失败：" + e.getMessage(), e);
         }
         return loadFileConfig();
+    }
+
+    public ModelServiceConfig clearLocalConfig() {
+        try {
+            Files.deleteIfExists(CONFIG_PATH);
+        } catch (IOException e) {
+            throw new IllegalStateException("取消模型服务配置失败：" + e.getMessage(), e);
+        }
+        return loadStatusConfig();
+    }
+
+    public boolean hasLocalConfigFile() {
+        return Files.exists(CONFIG_PATH);
+    }
+
+    public boolean isLocalConfigured() {
+        return loadFileConfig().isConfigured();
+    }
+
+    public boolean isEnvironmentConfigured() {
+        return loadEnvironmentConfig().isConfigured();
     }
 
     private ModelServiceConfig loadEnvironmentConfig() {

@@ -84,6 +84,7 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#searchAuditButton").addEventListener("click", () => loadAuditLogs(1));
   $("#modelConfigForm").addEventListener("submit", saveModelConfig);
   $("#reloadModelConfigButton").addEventListener("click", loadModelConfig);
+  $("#clearModelConfigButton").addEventListener("click", clearModelConfig);
 });
 
 async function login(event) {
@@ -663,20 +664,33 @@ async function loadModelConfig() {
   form.model.value = data.model || "";
   form.apiKey.value = "";
   form.apiKey.placeholder = "";
-  const status = $("#modelConfigStatus");
-  status.textContent = data.configured ? `已配置 · ${data.sourceText}` : "未配置";
-  status.className = `status ${data.configured ? "approved" : "pending"}`;
+  updateModelConfigStatus(data);
 }
 
 async function saveModelConfig(event) {
   event.preventDefault();
   const data = await api("/api/model-config", { method: "POST", body: new FormData(event.currentTarget) });
   event.currentTarget.apiKey.value = "";
-  const status = $("#modelConfigStatus");
-  status.textContent = data.configured ? `已配置 · ${data.sourceText}` : "未配置";
-  status.className = `status ${data.configured ? "approved" : "pending"}`;
+  updateModelConfigStatus(data);
   toast(data.configured ? "模型服务配置已保存" : "配置已保存，但仍缺少接口地址、模型名或 API Key");
   await loadModelConfig();
+}
+
+async function clearModelConfig() {
+  if (!confirm("确定取消模型服务本地配置吗？")) return;
+  const data = await api("/api/model-config", { method: "DELETE" });
+  updateModelConfigStatus(data);
+  await loadModelConfig();
+  toast(data.environmentConfigured ? "本地配置已取消，当前使用环境变量配置" : "模型服务配置已取消");
+}
+
+function updateModelConfigStatus(data) {
+  const status = $("#modelConfigStatus");
+  status.textContent = data.configured ? `已配置 · ${data.sourceText}` : data.environmentConfigured ? "本地未配置 · 环境变量可用" : "未配置";
+  status.className = `status ${data.configured ? "approved" : "pending"}`;
+  const clearButton = $("#clearModelConfigButton");
+  clearButton.disabled = !data.localConfigPresent;
+  clearButton.title = data.localConfigPresent ? "" : "当前没有本地配置";
 }
 
 function openPasswordDialog() {
