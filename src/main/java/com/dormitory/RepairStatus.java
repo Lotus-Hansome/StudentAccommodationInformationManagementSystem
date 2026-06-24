@@ -4,7 +4,8 @@ public enum RepairStatus {
     PENDING("待处理"),
     PROCESSING("处理中"),
     DONE("已完成"),
-    REJECTED("已驳回");
+    REJECTED("已驳回"),
+    CANCELED("已撤回");
 
     private final String displayName;
 

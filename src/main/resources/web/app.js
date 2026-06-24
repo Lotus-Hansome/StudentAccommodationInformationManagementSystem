@@ -42,7 +42,8 @@ const titles = {
   studentHome: ["我的首页", "查看个人住宿、同宿舍成员和服务进度"],
   students: ["住宿信息", "维护学生住宿台账，支持查询、排序、分页、添加、修改和删除"],
   requests: ["调换申请", "提交、查看、撤回与审核宿舍调换申请"],
-  repairs: ["报修反馈", "提交宿舍报修并跟踪处理进度"],
+  repairSubmit: ["报修反馈", "提交宿舍维修问题和处理诉求"],
+  repairs: ["报修记录", "查看报修反馈处理进度并撤回未完成记录"],
   analytics: ["智能分析", "按楼栋或宿舍生成运营评估与建议"],
   occupancy: ["床位明细", "查询每栋楼和每个宿舍的入住、容量与空余床位"],
   buildings: ["楼栋管理", "维护楼栋名称、住宿类型、楼层和启停状态"],
@@ -53,6 +54,7 @@ const titles = {
 };
 
 const adminViews = ["dashboard", "students", "analytics", "occupancy", "buildings", "rooms", "users", "audit", "settings"];
+const studentOnlyViews = ["studentHome", "repairSubmit"];
 
 document.addEventListener("DOMContentLoaded", () => {
   $("#loginForm").addEventListener("submit", login);
@@ -169,14 +171,14 @@ function applyRole() {
   if (!isAdmin && active && adminViews.includes(active.dataset.view)) {
     navigate("studentHome");
   }
-  if (isAdmin && active && active.dataset.view === "studentHome") {
+  if (isAdmin && active && studentOnlyViews.includes(active.dataset.view)) {
     navigate("dashboard");
   }
 }
 
 function navigate(view) {
   if (adminViews.includes(view) && state.role !== "ADMIN") return;
-  if (view === "studentHome" && state.role === "ADMIN") return;
+  if (studentOnlyViews.includes(view) && state.role === "ADMIN") return;
   $$(".nav button").forEach((button) => button.classList.toggle("active", button.dataset.view === view));
   $$(".view").forEach((section) => section.classList.toggle("active", section.id === `${view}View`));
   $("#pageTitle").textContent = titles[view][0];
@@ -484,8 +486,8 @@ async function submitRepair(event) {
   event.preventDefault();
   const result = await api("/api/repairs", { method: "POST", body: new FormData(event.currentTarget) });
   event.currentTarget.reset();
-  await loadRepairs(1);
   if (state.role !== "ADMIN") await loadStudentHome();
+  navigate("repairs");
   toast(`报修已提交：${result.id}`);
 }
 
@@ -506,14 +508,24 @@ function renderRepairs() {
       <td>${escapeHtml(repair.createdAt)}</td>
       <td>${escapeHtml(repair.handledAt || "")}</td>
       <td>${escapeHtml(repair.description)}${repair.adminComment ? ` / ${escapeHtml(repair.adminComment)}` : ""}</td>
-      ${state.role === "ADMIN" ? `<td><div class="row-actions">
-        <button class="btn" onclick="decideRepair('${escapeJs(repair.id)}','PROCESSING')">处理中</button>
-        <button class="btn success" onclick="decideRepair('${escapeJs(repair.id)}','DONE')"><svg><use href="#icon-check"></use></svg>完成</button>
-        <button class="btn danger" onclick="decideRepair('${escapeJs(repair.id)}','REJECTED')"><svg><use href="#icon-x"></use></svg>驳回</button>
-      </div></td>` : ""}
+      <td>${repairActions(repair)}</td>
     </tr>
   `).join("");
   renderPagination("repairsPagination", "repair", state.repairTotal, state.repairPage, state.repairPageSize);
+}
+
+function repairActions(repair) {
+  if (["DONE", "REJECTED", "CANCELED"].includes(repair.status)) return "";
+  if (state.role === "ADMIN") {
+    return `<div class="row-actions">
+      <button class="btn" onclick="decideRepair('${escapeJs(repair.id)}','PROCESSING')">处理中</button>
+      <button class="btn success" onclick="decideRepair('${escapeJs(repair.id)}','DONE')"><svg><use href="#icon-check"></use></svg>完成</button>
+      <button class="btn danger" onclick="decideRepair('${escapeJs(repair.id)}','REJECTED')"><svg><use href="#icon-x"></use></svg>驳回</button>
+    </div>`;
+  }
+  return `<div class="row-actions">
+    <button class="btn danger" onclick="cancelRepair('${escapeJs(repair.id)}')"><svg><use href="#icon-x"></use></svg>撤回</button>
+  </div>`;
 }
 
 async function decideRepair(repairId, status) {
@@ -528,6 +540,16 @@ async function decideRepair(repairId, status) {
   await api("/api/repairs/status", { method: "POST", body });
   await loadRepairs(state.repairPage);
   toast("报修状态已更新");
+}
+
+async function cancelRepair(repairId) {
+  if (!confirm("确认撤回该报修反馈吗？")) return;
+  const body = new FormData();
+  body.set("id", repairId);
+  await api("/api/repairs/cancel", { method: "POST", body });
+  await loadRepairs(state.repairPage);
+  if (state.role !== "ADMIN") await loadStudentHome();
+  toast("报修反馈已撤回");
 }
 
 async function analyzeDorm() {
@@ -995,7 +1017,7 @@ function requestColumnCount() {
 }
 
 function repairColumnCount() {
-  return state.role === "ADMIN" ? 9 : 8;
+  return 9;
 }
 
 function renderPagination(targetId, type, totalItems, currentPage, pageSize) {
@@ -1079,7 +1101,7 @@ function requestTimelineItem(request) {
 function repairTimelineItem(repair) {
   const endText = repair.handledAt ? `${escapeHtml(repair.handledAt)} · ${escapeHtml(repair.statusText)}` : escapeHtml(repair.statusText);
   return `
-    <div class="timeline-item ${repair.status === "DONE" ? "done" : repair.status === "REJECTED" ? "failed" : ""}">
+    <div class="timeline-item ${repair.status === "DONE" ? "done" : repair.status === "REJECTED" || repair.status === "CANCELED" ? "failed" : ""}">
       <div><strong>${escapeHtml(repair.category)} · ${escapeHtml(repair.dormNumber)}</strong><span>${escapeHtml(repair.createdAt)} 提交</span></div>
       <em>${endText}</em>
     </div>

@@ -63,6 +63,10 @@ public final class SmokeTestRunner {
         repairService.updateStatus(repair.getId(), "DONE", "Fixed");
         require(repairService.listByStudentId("T001").get(0).getStatus() == RepairStatus.DONE,
                 "repair status should be updateable");
+        RepairReport cancelRepair = repairService.submit("T001", "9-101", "Furniture", "Desk screw is loose");
+        repairService.cancel(cancelRepair.getId(), "T001");
+        require(repairService.listByStudentId("T001").stream().anyMatch(item -> item.getStatus() == RepairStatus.CANCELED),
+                "student should be able to cancel an active repair report");
 
         UserService userService = new UserService(new InMemoryUserRepository());
         userService.create("admin2", "admin234", "ADMIN", "", true);

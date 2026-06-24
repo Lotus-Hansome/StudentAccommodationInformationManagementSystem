@@ -55,7 +55,8 @@
             <button data-view="studentHome" data-student-only><svg><use href="#icon-users"></use></svg>我的首页</button>
             <button data-view="students" data-admin-only><svg><use href="#icon-users"></use></svg>住宿信息</button>
             <button data-view="requests"><svg><use href="#icon-swap"></use></svg>调换申请</button>
-            <button data-view="repairs"><svg><use href="#icon-log"></use></svg>报修反馈</button>
+            <button data-view="repairSubmit" data-student-only><svg><use href="#icon-plus"></use></svg>报修反馈</button>
+            <button data-view="repairs"><svg><use href="#icon-log"></use></svg>报修记录</button>
             <button data-view="analytics" data-admin-only><svg><use href="#icon-chart"></use></svg>智能分析</button>
             <button data-view="occupancy" data-admin-only><svg><use href="#icon-search"></use></svg>床位明细</button>
             <button data-view="buildings" data-admin-only><svg><use href="#icon-building"></use></svg>楼栋管理</button>
@@ -219,30 +220,31 @@
             </div>
         </section>
 
+        <section id="repairSubmitView" class="view">
+            <section id="repairSubmitPanel" class="panel editor-panel">
+                <div class="panel-head"><h3>提交报修反馈</h3></div>
+                <form id="repairForm" class="form-grid">
+                    <label><span>问题类型</span><select name="category"><option value="水电">水电</option><option value="门锁">门锁</option><option value="家具">家具</option><option value="网络">网络</option><option value="空调">空调</option><option value="其他">其他</option></select></label>
+                    <label class="wide"><span>问题描述</span><textarea name="description" rows="5" required></textarea></label>
+                    <div class="form-actions"><button class="btn primary" type="submit"><svg><use href="#icon-plus"></use></svg>提交报修</button></div>
+                </form>
+            </section>
+        </section>
+
         <section id="repairsView" class="view">
-            <div class="content-grid">
-                <section id="repairSubmitPanel" class="panel editor-panel">
-                    <div class="panel-head"><h3>提交报修反馈</h3></div>
-                    <form id="repairForm" class="form-grid">
-                        <label><span>问题类型</span><select name="category"><option value="水电">水电</option><option value="门锁">门锁</option><option value="家具">家具</option><option value="网络">网络</option><option value="空调">空调</option><option value="其他">其他</option></select></label>
-                        <label class="wide"><span>问题描述</span><textarea name="description" rows="5" required></textarea></label>
-                        <div class="form-actions"><button class="btn primary" type="submit"><svg><use href="#icon-plus"></use></svg>提交报修</button></div>
-                    </form>
-                </section>
-                <section class="panel main-panel">
-                    <div class="panel-head">
-                        <h3>报修反馈记录</h3>
-                        <button id="reloadRepairsButton" class="btn">刷新</button>
-                    </div>
-                    <div class="table-wrap">
-                        <table>
-                            <thead><tr><th>编号</th><th>学号</th><th>宿舍</th><th>类型</th><th>状态</th><th>提交时间</th><th>处理时间</th><th>问题/反馈</th><th data-admin-only>操作</th></tr></thead>
-                            <tbody id="repairsTable"></tbody>
-                        </table>
-                    </div>
-                    <div id="repairsPagination" class="pagination"></div>
-                </section>
-            </div>
+            <section class="panel main-panel">
+                <div class="panel-head">
+                    <h3>报修反馈记录</h3>
+                    <button id="reloadRepairsButton" class="btn">刷新</button>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>编号</th><th>学号</th><th>宿舍</th><th>类型</th><th>状态</th><th>提交时间</th><th>处理时间</th><th>问题/反馈</th><th>操作</th></tr></thead>
+                        <tbody id="repairsTable"></tbody>
+                    </table>
+                </div>
+                <div id="repairsPagination" class="pagination"></div>
+            </section>
         </section>
 
         <section id="analyticsView" class="view">

@@ -126,6 +126,10 @@ public class DormitoryWebServer {
             repairDecision(exchange);
             return;
         }
+        if ("/api/repairs/cancel".equals(path) && "POST".equalsIgnoreCase(method)) {
+            cancelRepair(exchange);
+            return;
+        }
         if ("/api/repairs".equals(path)) {
             repairs(exchange, method);
             return;
@@ -396,6 +400,16 @@ public class DormitoryWebServer {
         repairReportService.updateStatus(repairId, status, comment);
         operationLogService.record(admin.getUsername(), "UPDATE_REPAIR", "repair_report", repairId, status + "：" + comment);
         sendJson(exchange, 200, "{\"success\":true,\"message\":\"报修反馈已更新。\"}");
+    }
+
+    private void cancelRepair(HttpExchange exchange) throws IOException {
+        User user = requireUser(exchange);
+        Map<String, String> form = readForm(exchange);
+        String repairId = form.getOrDefault("id", "");
+        String studentId = requireBoundStudent(user);
+        repairReportService.cancel(repairId, studentId);
+        operationLogService.record(user.getUsername(), "CANCEL_REPAIR", "repair_report", repairId, "学生撤回报修反馈");
+        sendJson(exchange, 200, "{\"success\":true,\"message\":\"报修反馈已撤回。\"}");
     }
 
     private void requestDecision(HttpExchange exchange, boolean approve) throws IOException {

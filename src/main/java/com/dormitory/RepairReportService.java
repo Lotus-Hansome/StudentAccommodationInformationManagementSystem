@@ -79,6 +79,25 @@ public class RepairReportService {
         save();
     }
 
+    public void cancel(String id, String studentId) {
+        String normalizedId = normalizeText(id);
+        String normalizedStudentId = normalizeText(studentId);
+        RepairReport report = reports.stream()
+                .filter(item -> item.getId().equalsIgnoreCase(normalizedId))
+                .filter(item -> item.getStudentId().equalsIgnoreCase(normalizedStudentId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("未找到可撤回的报修反馈。"));
+        if (report.getStatus() == RepairStatus.DONE
+                || report.getStatus() == RepairStatus.REJECTED
+                || report.getStatus() == RepairStatus.CANCELED) {
+            throw new IllegalArgumentException("该报修反馈已处理结束，不能撤回。");
+        }
+        report.setStatus(RepairStatus.CANCELED);
+        report.setHandledAt(LocalDateTime.now());
+        report.setAdminComment("学生主动撤回。");
+        save();
+    }
+
     private void save() {
         try {
             repository.save(reports);
