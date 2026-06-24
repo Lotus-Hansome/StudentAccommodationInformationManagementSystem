@@ -23,6 +23,7 @@ const state = {
   auditPage: 1,
   auditPageSize: 20,
   auditKeyword: "",
+  modelConfig: null,
 };
 
 const pageSizeOptions = [10, 20, 50];
@@ -85,6 +86,10 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#modelConfigForm").addEventListener("submit", saveModelConfig);
   $("#reloadModelConfigButton").addEventListener("click", loadModelConfig);
   $("#clearModelConfigButton").addEventListener("click", clearModelConfig);
+  $("#enableModelConfigButton").addEventListener("click", enableModelConfig);
+  $("#toggleModelConfigButton").addEventListener("click", () => setModelEditorVisible(true));
+  $("#cancelModelEditButton").addEventListener("click", () => setModelEditorVisible(false));
+  $("#copyModelUrlButton").addEventListener("click", copyModelConfigUrl);
 });
 
 async function login(event) {
@@ -665,6 +670,7 @@ async function loadModelConfig() {
   form.apiKey.value = "";
   form.apiKey.placeholder = "";
   updateModelConfigStatus(data);
+  setModelEditorVisible(!data.configured);
 }
 
 async function saveModelConfig(event) {
@@ -684,13 +690,58 @@ async function clearModelConfig() {
   toast(data.environmentConfigured ? "本地配置已取消，当前使用环境变量配置" : "模型服务配置已取消");
 }
 
+function enableModelConfig() {
+  const form = $("#modelConfigForm");
+  const hasApiUrl = form.apiUrl.value.trim();
+  const hasModel = form.model.value.trim();
+  const hasApiKey = form.apiKey.value.trim() || (state.modelConfig && state.modelConfig.apiKeySet);
+  if (!hasApiUrl || !hasModel || !hasApiKey) {
+    setModelEditorVisible(true);
+    toast("请先填写接口地址、模型名称和 API Key");
+    return;
+  }
+  form.requestSubmit();
+}
+
 function updateModelConfigStatus(data) {
+  state.modelConfig = data;
+  const provider = inferModelProvider(data.apiUrl, data.model);
+  $("#modelProviderName").textContent = provider.name;
+  $("#modelProviderMark").textContent = provider.mark;
+  $("#modelConfigUrl").textContent = data.apiUrl || "未填写接口地址";
+  $("#modelConfigModel").textContent = `模型：${data.model || "未设置"}`;
+  $("#modelConfigKeyStatus").textContent = `API Key：${data.apiKeySet ? "已保存" : "未设置"}`;
+  $("#modelProviderCard").classList.toggle("configured", data.configured);
   const status = $("#modelConfigStatus");
   status.textContent = data.configured ? `已配置 · ${data.sourceText}` : data.environmentConfigured ? "本地未配置 · 环境变量可用" : "未配置";
   status.className = `status ${data.configured ? "approved" : "pending"}`;
   const clearButton = $("#clearModelConfigButton");
   clearButton.disabled = !data.localConfigPresent;
   clearButton.title = data.localConfigPresent ? "" : "当前没有本地配置";
+}
+
+function setModelEditorVisible(visible) {
+  $("#modelConfigForm").classList.toggle("hidden", !visible);
+}
+
+async function copyModelConfigUrl() {
+  const url = (state.modelConfig && state.modelConfig.apiUrl) || $("#modelConfigForm").apiUrl.value.trim();
+  if (!url) return toast("暂无接口地址可复制");
+  try {
+    await navigator.clipboard.writeText(url);
+    toast("接口地址已复制");
+  } catch (error) {
+    window.prompt("复制接口地址", url);
+  }
+}
+
+function inferModelProvider(apiUrl, model) {
+  const text = `${apiUrl || ""} ${model || ""}`.toLowerCase();
+  if (text.includes("deepseek")) return { name: "DeepSeek Compatible", mark: "DS" };
+  if (text.includes("openai")) return { name: "OpenAI Official", mark: "AI" };
+  if (text.includes("siliconflow")) return { name: "SiliconFlow", mark: "SF" };
+  if (text.includes("dashscope") || text.includes("aliyuncs")) return { name: "DashScope Compatible", mark: "DB" };
+  return { name: "OpenAI 兼容模型服务", mark: "LLM" };
 }
 
 function openPasswordDialog() {
