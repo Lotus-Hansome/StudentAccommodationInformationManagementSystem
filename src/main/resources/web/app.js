@@ -52,7 +52,7 @@ const titles = {
   settings: ["系统设置", "配置智能分析模型服务和运行参数"],
 };
 
-const adminViews = ["dashboard", "analytics", "occupancy", "buildings", "rooms", "users", "audit", "settings"];
+const adminViews = ["dashboard", "students", "analytics", "occupancy", "buildings", "rooms", "users", "audit", "settings"];
 
 document.addEventListener("DOMContentLoaded", () => {
   $("#loginForm").addEventListener("submit", login);
