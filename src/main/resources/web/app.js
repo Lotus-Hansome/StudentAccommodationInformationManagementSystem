@@ -45,7 +45,7 @@ const titles = {
   settings: ["系统设置", "配置智能分析模型服务和运行参数"],
 };
 
-const adminViews = ["analytics", "occupancy", "buildings", "rooms", "users", "audit", "settings"];
+const adminViews = ["dashboard", "analytics", "occupancy", "buildings", "rooms", "users", "audit", "settings"];
 
 document.addEventListener("DOMContentLoaded", () => {
   $("#loginForm").addEventListener("submit", login);
@@ -103,7 +103,7 @@ async function login(event) {
   $("#currentRole").textContent = data.role === "ADMIN" ? "系统管理员" : "普通用户";
   $("#currentUser").textContent = data.username;
   applyRole();
-  navigate("dashboard");
+  navigate(data.role === "ADMIN" ? "dashboard" : "students");
   toast("登录成功");
 }
 
@@ -154,7 +154,7 @@ function applyRole() {
   }
   const active = $(".nav button.active");
   if (!isAdmin && active && adminViews.includes(active.dataset.view)) {
-    navigate("dashboard");
+    navigate("students");
   }
 }
 
@@ -189,6 +189,12 @@ async function loadOverview() {
   $("#occupancyText").textContent = `${data.occupancyRate}%`;
   $("#occupancyBar").style.width = `${Math.min(data.occupancyRate, 100)}%`;
   renderDepartmentBars(data.departments, "#departmentBars");
+}
+
+async function refreshOverviewForAdmin() {
+  if (state.role === "ADMIN") {
+    await loadOverview();
+  }
 }
 
 async function loadStudents(mode, params = {}, page = 1) {
@@ -286,7 +292,7 @@ async function saveStudent(event) {
   const message = method === "PUT" ? "住宿信息修改成功" : "住宿信息添加成功";
   resetStudentForm();
   await reloadStudents();
-  await loadOverview();
+  await refreshOverviewForAdmin();
   toast(message);
 }
 
@@ -303,7 +309,7 @@ async function deleteStudent(studentId, dormNumber) {
   const query = new URLSearchParams({ studentId, dormNumber });
   await api(`/api/students?${query.toString()}`, { method: "DELETE" });
   await reloadStudents();
-  await loadOverview();
+  await refreshOverviewForAdmin();
   toast("记录已删除");
 }
 
@@ -315,7 +321,7 @@ async function submitRequest(event) {
   form.reset();
   if (state.role !== "ADMIN" && state.studentId) form.studentId.value = state.studentId;
   await loadRequests("student", { studentId: $("#requestStudentQuery").value.trim() }, 1);
-  await loadOverview();
+  await refreshOverviewForAdmin();
   toast(`申请已提交：${result.id}`);
 }
 
@@ -384,7 +390,7 @@ async function decideRequest(requestId, approved) {
   body.set("comment", comment.trim());
   await api(approved ? "/api/requests/approve" : "/api/requests/reject", { method: "POST", body });
   await loadRequests(state.requestMode, state.requestParams, state.requestPage);
-  await loadOverview();
+  await refreshOverviewForAdmin();
   toast("审批已完成");
 }
 
@@ -394,7 +400,7 @@ async function cancelRequest(requestId) {
   body.set("requestId", requestId);
   await api("/api/requests/cancel", { method: "POST", body });
   await loadRequests(state.requestMode, state.requestParams, state.requestPage);
-  await loadOverview();
+  await refreshOverviewForAdmin();
   toast("申请已撤回");
 }
 

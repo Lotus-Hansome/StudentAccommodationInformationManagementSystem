@@ -103,7 +103,7 @@ public class DormitoryWebServer {
             return;
         }
         if ("/api/overview".equals(path) && "GET".equalsIgnoreCase(method)) {
-            requireUser(exchange);
+            requireAdmin(exchange);
             overview(exchange);
             return;
         }
