@@ -57,6 +57,13 @@ public final class SmokeTestRunner {
         require(requestService.listByStudentId("T001").stream().anyMatch(item -> item.getStatus() == ChangeRequestStatus.CANCELED),
                 "student should be able to cancel a pending request");
 
+        RepairReportService repairService = new RepairReportService(new InMemoryRepairReportRepository());
+        RepairReport repair = repairService.submit("T001", "9-101", "Network", "Network port is unavailable");
+        require(repairService.listByStudentId("T001").size() == 1, "student repair report should be saved");
+        repairService.updateStatus(repair.getId(), "DONE", "Fixed");
+        require(repairService.listByStudentId("T001").get(0).getStatus() == RepairStatus.DONE,
+                "repair status should be updateable");
+
         UserService userService = new UserService(new InMemoryUserRepository());
         userService.create("admin2", "admin234", "ADMIN", "", true);
         long enabledAdmins = userService.listAll().stream()
@@ -128,6 +135,20 @@ public final class SmokeTestRunner {
 
         @Override
         public void updateLastLogin(String username) {
+        }
+    }
+
+    private static class InMemoryRepairReportRepository implements RepairReportRepository {
+        private List<RepairReport> reports = new ArrayList<>();
+
+        @Override
+        public List<RepairReport> load() {
+            return new ArrayList<>(reports);
+        }
+
+        @Override
+        public void save(List<RepairReport> reports) {
+            this.reports = new ArrayList<>(reports);
         }
     }
 

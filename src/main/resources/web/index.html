@@ -52,8 +52,10 @@
         </div>
         <nav class="nav">
             <button data-view="dashboard" class="active" data-admin-only><svg><use href="#icon-dashboard"></use></svg>数据看板</button>
+            <button data-view="studentHome" data-student-only><svg><use href="#icon-users"></use></svg>我的首页</button>
             <button data-view="students"><svg><use href="#icon-users"></use></svg>住宿信息</button>
             <button data-view="requests"><svg><use href="#icon-swap"></use></svg>调换申请</button>
+            <button data-view="repairs"><svg><use href="#icon-log"></use></svg>报修反馈</button>
             <button data-view="analytics" data-admin-only><svg><use href="#icon-chart"></use></svg>智能分析</button>
             <button data-view="occupancy" data-admin-only><svg><use href="#icon-search"></use></svg>床位明细</button>
             <button data-view="buildings" data-admin-only><svg><use href="#icon-building"></use></svg>楼栋管理</button>
@@ -93,6 +95,42 @@
                 <section class="panel">
                     <div class="panel-head"><h3>各系入住结构</h3></div>
                     <div id="departmentBars" class="bar-list"></div>
+                </section>
+            </div>
+        </section>
+
+        <section id="studentHomeView" class="view">
+            <div class="student-home-grid">
+                <section class="panel student-profile-card">
+                    <div class="panel-head"><h3>我的住宿</h3><span id="homeDormBadge" class="status approved">--</span></div>
+                    <div class="profile-summary">
+                        <div>
+                            <strong id="homeStudentName">--</strong>
+                            <span id="homeStudentMeta">--</span>
+                        </div>
+                        <div class="profile-room">
+                            <span>宿舍</span>
+                            <strong id="homeDormNumber">--</strong>
+                        </div>
+                    </div>
+                    <div class="profile-detail-grid">
+                        <div><span>学号</span><strong id="homeStudentId">--</strong></div>
+                        <div><span>楼栋</span><strong id="homeBuildingNumber">--</strong></div>
+                        <div><span>床位</span><strong id="homeBedNumber">--</strong></div>
+                        <div><span>宿舍电话</span><strong id="homeDormPhone">--</strong></div>
+                    </div>
+                </section>
+                <section class="panel">
+                    <div class="panel-head"><h3>同宿舍成员</h3></div>
+                    <div id="roommateList" class="roommate-list"></div>
+                </section>
+                <section class="panel">
+                    <div class="panel-head"><h3>调换申请进度</h3></div>
+                    <div id="homeRequestTimeline" class="timeline-list"></div>
+                </section>
+                <section class="panel">
+                    <div class="panel-head"><h3>报修反馈进度</h3></div>
+                    <div id="homeRepairTimeline" class="timeline-list"></div>
                 </section>
             </div>
         </section>
@@ -155,6 +193,10 @@
                         <label class="wide"><span>调换理由</span><textarea name="reason" rows="5" required></textarea></label>
                         <div class="form-actions"><button class="btn primary" type="submit"><svg><use href="#icon-plus"></use></svg>提交</button></div>
                     </form>
+                    <div class="timeline-block">
+                        <h4>申请时间线</h4>
+                        <div id="requestTimeline" class="timeline-list"></div>
+                    </div>
                 </section>
                 <section class="panel main-panel">
                     <div class="panel-head">
@@ -173,6 +215,32 @@
                         </table>
                     </div>
                     <div id="requestsPagination" class="pagination"></div>
+                </section>
+            </div>
+        </section>
+
+        <section id="repairsView" class="view">
+            <div class="content-grid">
+                <section id="repairSubmitPanel" class="panel editor-panel">
+                    <div class="panel-head"><h3>提交报修反馈</h3></div>
+                    <form id="repairForm" class="form-grid">
+                        <label><span>问题类型</span><select name="category"><option value="水电">水电</option><option value="门锁">门锁</option><option value="家具">家具</option><option value="网络">网络</option><option value="空调">空调</option><option value="其他">其他</option></select></label>
+                        <label class="wide"><span>问题描述</span><textarea name="description" rows="5" required></textarea></label>
+                        <div class="form-actions"><button class="btn primary" type="submit"><svg><use href="#icon-plus"></use></svg>提交报修</button></div>
+                    </form>
+                </section>
+                <section class="panel main-panel">
+                    <div class="panel-head">
+                        <h3>报修反馈记录</h3>
+                        <button id="reloadRepairsButton" class="btn">刷新</button>
+                    </div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead><tr><th>编号</th><th>学号</th><th>宿舍</th><th>类型</th><th>状态</th><th>提交时间</th><th>处理时间</th><th>问题/反馈</th><th data-admin-only>操作</th></tr></thead>
+                            <tbody id="repairsTable"></tbody>
+                        </table>
+                    </div>
+                    <div id="repairsPagination" class="pagination"></div>
                 </section>
             </div>
         </section>

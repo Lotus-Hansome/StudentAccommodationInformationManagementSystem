@@ -336,6 +336,12 @@ svg {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
 }
 
+.student-home-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
+    gap: 16px;
+}
+
 .panel {
     min-width: 0;
     border: 1px solid var(--line);
@@ -348,8 +354,142 @@ svg {
     min-height: 520px;
 }
 
+#requestSubmitPanel.hidden + .main-panel,
+#repairSubmitPanel.hidden + .main-panel {
+    grid-column: 1 / -1;
+}
+
 .editor-panel {
     align-self: start;
+}
+
+.student-profile-card {
+    min-height: 280px;
+}
+
+.profile-summary {
+    display: flex;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 20px 22px 8px;
+}
+
+.profile-summary strong {
+    display: block;
+    font-size: 26px;
+}
+
+.profile-summary span,
+.profile-detail-grid span,
+.roommate-item span,
+.timeline-item span {
+    color: var(--muted);
+}
+
+.profile-room {
+    min-width: 130px;
+    padding: 14px;
+    border-radius: var(--radius);
+    background: #f7fbff;
+    text-align: right;
+}
+
+.profile-room strong {
+    margin-top: 4px;
+    color: var(--primary-dark);
+}
+
+.profile-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(140px, 1fr));
+    gap: 12px;
+    padding: 16px 22px 22px;
+}
+
+.profile-detail-grid div {
+    padding: 13px;
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius);
+    background: #fff;
+}
+
+.profile-detail-grid strong {
+    display: block;
+    margin-top: 5px;
+}
+
+.roommate-list,
+.timeline-list {
+    display: grid;
+    gap: 10px;
+    padding: 16px;
+}
+
+.roommate-item,
+.timeline-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 12px 14px;
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius);
+    background: #fff;
+}
+
+.roommate-item.current {
+    border-color: #bfdfd4;
+    background: #f4fbf8;
+}
+
+.roommate-item strong,
+.timeline-item strong {
+    display: block;
+}
+
+.roommate-item em,
+.timeline-item em {
+    flex: 0 0 auto;
+    color: var(--primary-dark);
+    font-style: normal;
+    font-weight: 700;
+}
+
+.timeline-item {
+    position: relative;
+    padding-left: 28px;
+}
+
+.timeline-item::before {
+    content: "";
+    position: absolute;
+    left: 12px;
+    top: 18px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--warning);
+}
+
+.timeline-item.done::before {
+    background: var(--success);
+}
+
+.timeline-item.failed::before {
+    background: var(--danger);
+}
+
+.timeline-block {
+    border-top: 1px solid var(--line-soft);
+}
+
+.timeline-block h4 {
+    margin: 14px 16px 0;
+}
+
+.empty-note {
+    padding: 16px;
+    color: var(--muted);
 }
 
 .panel-head {
@@ -864,7 +1004,7 @@ code {
         grid-template-columns: 210px minmax(0, 1fr);
     }
 
-    .content-grid, .analysis-grid, .dashboard-grid, .split-grid {
+    .content-grid, .analysis-grid, .dashboard-grid, .split-grid, .student-home-grid {
         grid-template-columns: 1fr;
     }
 }
@@ -889,6 +1029,22 @@ code {
     }
 
     .metric-grid, .metric-grid.compact {
+        grid-template-columns: 1fr;
+    }
+
+    .profile-summary,
+    .roommate-item,
+    .timeline-item {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .profile-room {
+        width: 100%;
+        text-align: left;
+    }
+
+    .profile-detail-grid {
         grid-template-columns: 1fr;
     }
 

@@ -15,6 +15,11 @@ const state = {
   requestPageSize: 10,
   requestMode: "pending",
   requestParams: {},
+  repairs: [],
+  repairTotal: 0,
+  repairPage: 1,
+  repairPageSize: 10,
+  homeData: null,
   users: [],
   buildings: [],
   rooms: [],
@@ -34,8 +39,10 @@ const $$ = (selector) => Array.from(document.querySelectorAll(selector));
 
 const titles = {
   dashboard: ["数据看板", "实时掌握宿舍入住和调换申请状态"],
+  studentHome: ["我的首页", "查看个人住宿、同宿舍成员和服务进度"],
   students: ["住宿信息", "维护学生住宿台账，支持查询、排序、分页、添加、修改和删除"],
   requests: ["调换申请", "提交、查看、撤回与审核宿舍调换申请"],
+  repairs: ["报修反馈", "提交宿舍报修并跟踪处理进度"],
   analytics: ["智能分析", "按楼栋或宿舍生成运营评估与建议"],
   occupancy: ["床位明细", "查询每栋楼和每个宿舍的入住、容量与空余床位"],
   buildings: ["楼栋管理", "维护楼栋名称、住宿类型、楼层和启停状态"],
@@ -67,6 +74,8 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#pendingRequestsButton").addEventListener("click", () => loadRequests("pending", {}, 1));
   $("#allRequestsButton").addEventListener("click", () => loadRequests("all", {}, 1));
   $("#myRequestsButton").addEventListener("click", loadStudentRequests);
+  $("#repairForm").addEventListener("submit", submitRepair);
+  $("#reloadRepairsButton").addEventListener("click", () => loadRepairs(1));
 
   $("#analyzeButton").addEventListener("click", analyzeDorm);
   $("#occupancyScope").addEventListener("change", updateOccupancyPlaceholder);
@@ -103,7 +112,7 @@ async function login(event) {
   $("#currentRole").textContent = data.role === "ADMIN" ? "系统管理员" : "普通用户";
   $("#currentUser").textContent = data.username;
   applyRole();
-  navigate(data.role === "ADMIN" ? "dashboard" : "students");
+  navigate(data.role === "ADMIN" ? "dashboard" : "studentHome");
   toast("登录成功");
 }
 
@@ -127,6 +136,8 @@ async function logout() {
     buildings: [],
     rooms: [],
     logs: [],
+    repairs: [],
+    homeData: null,
   });
   $("#appShell").classList.add("hidden");
   $("#loginPage").classList.remove("hidden");
@@ -140,7 +151,9 @@ async function logout() {
 function applyRole() {
   const isAdmin = state.role === "ADMIN";
   $$("[data-admin-only]").forEach((node) => node.classList.toggle("hidden", !isAdmin));
+  $$("[data-student-only]").forEach((node) => node.classList.toggle("hidden", isAdmin));
   $("#requestSubmitPanel").classList.toggle("hidden", isAdmin);
+  $("#repairSubmitPanel").classList.toggle("hidden", isAdmin);
   const requestForm = $("#requestForm");
   const requestStudentQuery = $("#requestStudentQuery");
   if (!isAdmin && state.studentId) {
@@ -154,21 +167,27 @@ function applyRole() {
   }
   const active = $(".nav button.active");
   if (!isAdmin && active && adminViews.includes(active.dataset.view)) {
-    navigate("students");
+    navigate("studentHome");
+  }
+  if (isAdmin && active && active.dataset.view === "studentHome") {
+    navigate("dashboard");
   }
 }
 
 function navigate(view) {
   if (adminViews.includes(view) && state.role !== "ADMIN") return;
+  if (view === "studentHome" && state.role === "ADMIN") return;
   $$(".nav button").forEach((button) => button.classList.toggle("active", button.dataset.view === view));
   $$(".view").forEach((section) => section.classList.toggle("active", section.id === `${view}View`));
   $("#pageTitle").textContent = titles[view][0];
   $("#pageSubtitle").textContent = titles[view][1];
   if (view === "dashboard") loadOverview();
+  if (view === "studentHome") loadStudentHome();
   if (view === "students") loadStudents("all", {}, 1);
   if (view === "requests") {
     loadRequests(state.role === "ADMIN" ? "pending" : "student", state.role === "ADMIN" ? {} : { studentId: state.studentId }, 1);
   }
+  if (view === "repairs") loadRepairs(1);
   if (view === "occupancy") {
     updateOccupancyPlaceholder();
     loadOccupancyDetails($("#occupancyScope").value, $("#occupancyQuery").value.trim());
@@ -195,6 +214,41 @@ async function refreshOverviewForAdmin() {
   if (state.role === "ADMIN") {
     await loadOverview();
   }
+}
+
+async function loadStudentHome() {
+  const data = await api("/api/student-home");
+  state.homeData = data;
+  renderStudentHome(data);
+}
+
+function renderStudentHome(data) {
+  const student = data.student || {};
+  $("#homeStudentName").textContent = student.name || "--";
+  $("#homeStudentMeta").textContent = `${student.department || "--"} · ${student.className || "--"}`;
+  $("#homeStudentId").textContent = student.studentId || "--";
+  $("#homeDormNumber").textContent = student.dormNumber || "--";
+  $("#homeDormBadge").textContent = student.bedNumber ? `${student.bedNumber}号床` : "--";
+  $("#homeBuildingNumber").textContent = student.buildingNumber ? `${student.buildingNumber}号楼` : "--";
+  $("#homeBedNumber").textContent = student.bedNumber || "--";
+  $("#homeDormPhone").textContent = student.dormPhone || "--";
+  renderRoommates(data.roommates || [], student.studentId || "");
+  renderTimeline("homeRequestTimeline", data.requests || [], requestTimelineItem);
+  renderTimeline("homeRepairTimeline", data.repairs || [], repairTimelineItem);
+}
+
+function renderRoommates(roommates, currentStudentId) {
+  const target = $("#roommateList");
+  if (!roommates.length) {
+    target.innerHTML = `<div class="empty-note">暂无同宿舍成员信息</div>`;
+    return;
+  }
+  target.innerHTML = roommates.map((item) => `
+    <div class="roommate-item ${item.studentId === currentStudentId ? "current" : ""}">
+      <div><strong>${escapeHtml(item.name)}</strong><span>${escapeHtml(item.department)} · ${escapeHtml(item.className)}</span></div>
+      <em>${escapeHtml(item.bedNumber)}号床</em>
+    </div>
+  `).join("");
 }
 
 async function loadStudents(mode, params = {}, page = 1) {
@@ -321,6 +375,7 @@ async function submitRequest(event) {
   form.reset();
   if (state.role !== "ADMIN" && state.studentId) form.studentId.value = state.studentId;
   await loadRequests("student", { studentId: $("#requestStudentQuery").value.trim() }, 1);
+  if (state.role !== "ADMIN") await loadStudentHome();
   await refreshOverviewForAdmin();
   toast(`申请已提交：${result.id}`);
 }
@@ -354,6 +409,7 @@ function renderRequests() {
   const tbody = $("#requestsTable");
   if (!state.requests.length) {
     tbody.innerHTML = `<tr><td colspan="${requestColumnCount()}">暂无申请</td></tr>`;
+    renderRequestTimeline();
     renderPagination("requestsPagination", "request", state.requestTotal, state.requestPage, state.requestPageSize);
     return;
   }
@@ -373,12 +429,20 @@ function renderRequests() {
       </div>` : ""}</td>` : `<td>${request.status === "PENDING" ? `<button class="btn danger" onclick="cancelRequest('${escapeJs(request.id)}')"><svg><use href="#icon-x"></use></svg>撤回</button>` : ""}</td>`}
     </tr>
   `).join("");
+  renderRequestTimeline();
   renderPagination("requestsPagination", "request", state.requestTotal, state.requestPage, state.requestPageSize);
 }
 
 function renderRequestsMessage(message) {
   $("#requestsTable").innerHTML = `<tr><td colspan="${requestColumnCount()}">${escapeHtml(message)}</td></tr>`;
+  renderRequestTimeline();
   renderPagination("requestsPagination", "request", 0, state.requestPage, state.requestPageSize);
+}
+
+function renderRequestTimeline() {
+  if (state.role !== "ADMIN") {
+    renderTimeline("requestTimeline", state.requests, requestTimelineItem);
+  }
 }
 
 async function decideRequest(requestId, approved) {
@@ -400,8 +464,70 @@ async function cancelRequest(requestId) {
   body.set("requestId", requestId);
   await api("/api/requests/cancel", { method: "POST", body });
   await loadRequests(state.requestMode, state.requestParams, state.requestPage);
+  if (state.role !== "ADMIN") await loadStudentHome();
   await refreshOverviewForAdmin();
   toast("申请已撤回");
+}
+
+async function loadRepairs(page = 1) {
+  state.repairPage = page;
+  const query = new URLSearchParams({ page, pageSize: state.repairPageSize });
+  const data = await api(`/api/repairs?${query.toString()}`);
+  state.repairs = data.repairs;
+  state.repairTotal = data.total ?? data.repairs.length;
+  state.repairPage = data.page ?? page;
+  state.repairPageSize = data.pageSize ?? state.repairPageSize;
+  renderRepairs();
+}
+
+async function submitRepair(event) {
+  event.preventDefault();
+  const result = await api("/api/repairs", { method: "POST", body: new FormData(event.currentTarget) });
+  event.currentTarget.reset();
+  await loadRepairs(1);
+  if (state.role !== "ADMIN") await loadStudentHome();
+  toast(`报修已提交：${result.id}`);
+}
+
+function renderRepairs() {
+  const tbody = $("#repairsTable");
+  if (!state.repairs.length) {
+    tbody.innerHTML = `<tr><td colspan="${repairColumnCount()}">暂无报修反馈</td></tr>`;
+    renderPagination("repairsPagination", "repair", state.repairTotal, state.repairPage, state.repairPageSize);
+    return;
+  }
+  tbody.innerHTML = state.repairs.map((repair) => `
+    <tr>
+      <td>${escapeHtml(repair.id)}</td>
+      <td>${escapeHtml(repair.studentId)}</td>
+      <td>${escapeHtml(repair.dormNumber)}</td>
+      <td>${escapeHtml(repair.category)}</td>
+      <td>${statusBadge(repair.status, repair.statusText)}</td>
+      <td>${escapeHtml(repair.createdAt)}</td>
+      <td>${escapeHtml(repair.handledAt || "")}</td>
+      <td>${escapeHtml(repair.description)}${repair.adminComment ? ` / ${escapeHtml(repair.adminComment)}` : ""}</td>
+      ${state.role === "ADMIN" ? `<td><div class="row-actions">
+        <button class="btn" onclick="decideRepair('${escapeJs(repair.id)}','PROCESSING')">处理中</button>
+        <button class="btn success" onclick="decideRepair('${escapeJs(repair.id)}','DONE')"><svg><use href="#icon-check"></use></svg>完成</button>
+        <button class="btn danger" onclick="decideRepair('${escapeJs(repair.id)}','REJECTED')"><svg><use href="#icon-x"></use></svg>驳回</button>
+      </div></td>` : ""}
+    </tr>
+  `).join("");
+  renderPagination("repairsPagination", "repair", state.repairTotal, state.repairPage, state.repairPageSize);
+}
+
+async function decideRepair(repairId, status) {
+  const defaultComment = status === "PROCESSING" ? "已安排维修人员处理" : status === "DONE" ? "已处理完成" : "";
+  const comment = prompt("请输入处理反馈：", defaultComment);
+  if (comment === null) return;
+  if (!comment.trim()) return toast("处理反馈不能为空");
+  const body = new FormData();
+  body.set("id", repairId);
+  body.set("status", status);
+  body.set("comment", comment.trim());
+  await api("/api/repairs/status", { method: "POST", body });
+  await loadRepairs(state.repairPage);
+  toast("报修状态已更新");
 }
 
 async function analyzeDorm() {
@@ -868,6 +994,10 @@ function requestColumnCount() {
   return 9;
 }
 
+function repairColumnCount() {
+  return state.role === "ADMIN" ? 9 : 8;
+}
+
 function renderPagination(targetId, type, totalItems, currentPage, pageSize) {
   const target = $(`#${targetId}`);
   if (!target) return;
@@ -897,6 +1027,7 @@ function renderPagination(targetId, type, totalItems, currentPage, pageSize) {
 function changePage(type, page) {
   if (type === "student") return loadStudents(state.studentMode, state.studentParams, page);
   if (type === "request") return loadRequests(state.requestMode, state.requestParams, page);
+  if (type === "repair") return loadRepairs(page);
   if (type === "audit") return loadAuditLogs(page);
 }
 
@@ -910,6 +1041,10 @@ function changePageSize(type, pageSize) {
     state.requestPageSize = size;
     return loadRequests(state.requestMode, state.requestParams, 1);
   }
+  if (type === "repair" && pageSizeOptions.includes(size)) {
+    state.repairPageSize = size;
+    return loadRepairs(1);
+  }
   if (type === "audit" && auditPageSizeOptions.includes(size)) {
     state.auditPageSize = size;
     return loadAuditLogs(1);
@@ -917,8 +1052,38 @@ function changePageSize(type, pageSize) {
 }
 
 function statusBadge(status, text) {
-  const klass = status === "APPROVED" ? "approved" : status === "REJECTED" || status === "CANCELED" ? "rejected" : "pending";
+  const klass = status === "APPROVED" || status === "DONE" ? "approved" : status === "REJECTED" || status === "CANCELED" ? "rejected" : "pending";
   return `<span class="status ${klass}">${escapeHtml(text)}</span>`;
+}
+
+function renderTimeline(targetId, items, renderer) {
+  const target = $(`#${targetId}`);
+  if (!target) return;
+  if (!items.length) {
+    target.innerHTML = `<div class="empty-note">暂无记录</div>`;
+    return;
+  }
+  target.innerHTML = items.slice(0, 5).map(renderer).join("");
+}
+
+function requestTimelineItem(request) {
+  const endText = request.handledAt ? `${escapeHtml(request.handledAt)} · ${escapeHtml(request.statusText)}` : escapeHtml(request.statusText);
+  return `
+    <div class="timeline-item ${request.status === "APPROVED" ? "done" : request.status === "REJECTED" || request.status === "CANCELED" ? "failed" : ""}">
+      <div><strong>${escapeHtml(request.currentDormNumber)} / ${escapeHtml(request.currentBedNumber)} → ${escapeHtml(request.targetDormNumber)} / ${escapeHtml(request.targetBedNumber)}</strong><span>${escapeHtml(request.createdAt)} 提交</span></div>
+      <em>${endText}</em>
+    </div>
+  `;
+}
+
+function repairTimelineItem(repair) {
+  const endText = repair.handledAt ? `${escapeHtml(repair.handledAt)} · ${escapeHtml(repair.statusText)}` : escapeHtml(repair.statusText);
+  return `
+    <div class="timeline-item ${repair.status === "DONE" ? "done" : repair.status === "REJECTED" ? "failed" : ""}">
+      <div><strong>${escapeHtml(repair.category)} · ${escapeHtml(repair.dormNumber)}</strong><span>${escapeHtml(repair.createdAt)} 提交</span></div>
+      <em>${endText}</em>
+    </div>
+  `;
 }
 
 function statusText(status) {

@@ -33,6 +33,7 @@ public class DormitoryWebServer {
     private final UserService userService;
     private final StudentDormService studentDormService;
     private final ChangeRequestService changeRequestService;
+    private final RepairReportService repairReportService;
     private final DormAnalysisService dormAnalysisService;
     private final ModelConfigService modelConfigService;
     private final DormInfrastructureService infrastructureService;
@@ -50,6 +51,7 @@ public class DormitoryWebServer {
         this.infrastructureService = new DormInfrastructureService(new MysqlDormInfrastructureRepository(connectionFactory));
         this.studentDormService = new StudentDormService(new MysqlStudentRepository(connectionFactory), infrastructureService);
         this.changeRequestService = new ChangeRequestService(new MysqlChangeRequestRepository(connectionFactory), studentDormService);
+        this.repairReportService = new RepairReportService(new MysqlRepairReportRepository(connectionFactory));
         this.dormAnalysisService = new DormAnalysisService();
         this.modelConfigService = new ModelConfigService();
         this.operationLogService = new OperationLogService(new MysqlOperationLogRepository(connectionFactory));
@@ -107,12 +109,25 @@ public class DormitoryWebServer {
             overview(exchange);
             return;
         }
+        if ("/api/student-home".equals(path) && "GET".equalsIgnoreCase(method)) {
+            studentHome(exchange);
+            return;
+        }
         if ("/api/students".equals(path)) {
             students(exchange, method);
             return;
         }
         if ("/api/requests".equals(path)) {
             requests(exchange, method);
+            return;
+        }
+        if ("/api/repairs/status".equals(path) && "POST".equalsIgnoreCase(method)) {
+            requireAdmin(exchange);
+            repairDecision(exchange);
+            return;
+        }
+        if ("/api/repairs".equals(path)) {
+            repairs(exchange, method);
             return;
         }
         if ("/api/requests/approve".equals(path) && "POST".equalsIgnoreCase(method)) {
@@ -224,6 +239,23 @@ public class DormitoryWebServer {
                 + "}");
     }
 
+    private void studentHome(HttpExchange exchange) throws IOException {
+        User user = requireUser(exchange);
+        String studentId = requireBoundStudent(user);
+        StudentDormRecord student = studentDormService.findByStudentId(studentId)
+                .orElseThrow(() -> new ApiException(404, "未找到当前学生住宿信息。"));
+        List<StudentDormRecord> roommates = studentDormService.findByDormNumber(student.getDormNumber());
+        List<DormChangeRequest> requests = changeRequestService.listByStudentId(studentId);
+        List<RepairReport> repairs = repairReportService.listByStudentId(studentId);
+        sendJson(exchange, 200, "{"
+                + WebJson.booleanProperty("success", true) + ","
+                + "\"student\":" + studentJson(student, false) + ","
+                + "\"roommates\":" + studentsJson(roommates, false) + ","
+                + "\"requests\":" + requestsJson(requests) + ","
+                + "\"repairs\":" + repairsJson(repairs)
+                + "}");
+    }
+
     private void students(HttpExchange exchange, String method) throws IOException {
         User user = requireUser(exchange);
         if ("GET".equalsIgnoreCase(method)) {
@@ -317,6 +349,53 @@ public class DormitoryWebServer {
             return;
         }
         throw new ApiException(405, "请求方法不支持。");
+    }
+
+    private void repairs(HttpExchange exchange, String method) throws IOException {
+        User user = requireUser(exchange);
+        if ("GET".equalsIgnoreCase(method)) {
+            Map<String, String> query = parseQuery(exchange.getRequestURI().getRawQuery());
+            List<RepairReport> reports = user.getRole() == UserRole.ADMIN
+                    ? repairReportService.listAll()
+                    : repairReportService.listByStudentId(requireBoundStudent(user));
+            int page = parseInt(query.get("page"), 1);
+            int pageSize = parseInt(query.get("pageSize"), 10);
+            PageResult<RepairReport> result = paginate(reports, page, pageSize);
+            sendJson(exchange, 200, "{"
+                    + WebJson.booleanProperty("success", true) + ","
+                    + "\"repairs\":" + repairsJson(result.getItems()) + ","
+                    + pageJson(result)
+                    + "}");
+            return;
+        }
+        if ("POST".equalsIgnoreCase(method)) {
+            Map<String, String> form = readForm(exchange);
+            String studentId = user.getRole() == UserRole.ADMIN
+                    ? form.getOrDefault("studentId", "")
+                    : requireBoundStudent(user);
+            StudentDormRecord student = studentDormService.findByStudentId(studentId)
+                    .orElseThrow(() -> new ApiException(404, "未找到学生住宿信息，不能提交报修。"));
+            RepairReport report = repairReportService.submit(
+                    student.getStudentId(),
+                    student.getDormNumber(),
+                    form.getOrDefault("category", ""),
+                    form.getOrDefault("description", ""));
+            operationLogService.record(user.getUsername(), "SUBMIT_REPAIR", "repair_report", report.getId(), "提交宿舍报修反馈");
+            sendJson(exchange, 200, "{\"success\":true,\"id\":" + WebJson.quote(report.getId()) + "}");
+            return;
+        }
+        throw new ApiException(405, "请求方法不支持。");
+    }
+
+    private void repairDecision(HttpExchange exchange) throws IOException {
+        User admin = requireAdmin(exchange);
+        Map<String, String> form = readForm(exchange);
+        String repairId = form.getOrDefault("id", "");
+        String status = form.getOrDefault("status", "PROCESSING");
+        String comment = form.getOrDefault("comment", "");
+        repairReportService.updateStatus(repairId, status, comment);
+        operationLogService.record(admin.getUsername(), "UPDATE_REPAIR", "repair_report", repairId, status + "：" + comment);
+        sendJson(exchange, 200, "{\"success\":true,\"message\":\"报修反馈已更新。\"}");
     }
 
     private void requestDecision(HttpExchange exchange, boolean approve) throws IOException {
@@ -574,19 +653,24 @@ public class DormitoryWebServer {
             if (i > 0) {
                 builder.append(',');
             }
-            builder.append('{')
-                    .append(WebJson.property("studentId", record.getStudentId())).append(',')
-                    .append(WebJson.property("name", record.getName())).append(',')
-                    .append(WebJson.property("department", record.getDepartment())).append(',')
-                    .append(WebJson.property("className", record.getClassName())).append(',')
-                    .append(WebJson.property("dormNumber", record.getDormNumber())).append(',')
-                    .append(WebJson.property("dormPhone", record.getDormPhone())).append(',')
-                    .append(WebJson.property("bedNumber", record.getBedNumber())).append(',')
-                    .append(WebJson.booleanProperty("editable", includeActions))
-                    .append('}');
+            builder.append(studentJson(record, includeActions));
         }
         builder.append(']');
         return builder.toString();
+    }
+
+    private String studentJson(StudentDormRecord record, boolean includeActions) {
+        return "{"
+                + WebJson.property("studentId", record.getStudentId()) + ","
+                + WebJson.property("name", record.getName()) + ","
+                + WebJson.property("department", record.getDepartment()) + ","
+                + WebJson.property("className", record.getClassName()) + ","
+                + WebJson.property("dormNumber", record.getDormNumber()) + ","
+                + WebJson.property("buildingNumber", record.getBuildingNumber()) + ","
+                + WebJson.property("dormPhone", record.getDormPhone()) + ","
+                + WebJson.property("bedNumber", record.getBedNumber()) + ","
+                + WebJson.booleanProperty("editable", includeActions)
+                + "}";
     }
 
     private String requestsJson(List<DormChangeRequest> requests) {
@@ -610,6 +694,30 @@ public class DormitoryWebServer {
                     .append(WebJson.property("createdAt", request.getCreatedAt().format(DATE_TIME_FORMATTER))).append(',')
                     .append(WebJson.property("handledAt", request.getHandledAt() == null ? "" : request.getHandledAt().format(DATE_TIME_FORMATTER))).append(',')
                     .append(WebJson.property("adminComment", request.getAdminComment()))
+                    .append('}');
+        }
+        builder.append(']');
+        return builder.toString();
+    }
+
+    private String repairsJson(List<RepairReport> repairs) {
+        StringBuilder builder = new StringBuilder("[");
+        for (int i = 0; i < repairs.size(); i++) {
+            RepairReport repair = repairs.get(i);
+            if (i > 0) {
+                builder.append(',');
+            }
+            builder.append('{')
+                    .append(WebJson.property("id", repair.getId())).append(',')
+                    .append(WebJson.property("studentId", repair.getStudentId())).append(',')
+                    .append(WebJson.property("dormNumber", repair.getDormNumber())).append(',')
+                    .append(WebJson.property("category", repair.getCategory())).append(',')
+                    .append(WebJson.property("description", repair.getDescription())).append(',')
+                    .append(WebJson.property("status", repair.getStatus().name())).append(',')
+                    .append(WebJson.property("statusText", repair.getStatus().getDisplayName())).append(',')
+                    .append(WebJson.property("createdAt", repair.getCreatedAt().format(DATE_TIME_FORMATTER))).append(',')
+                    .append(WebJson.property("handledAt", repair.getHandledAt() == null ? "" : repair.getHandledAt().format(DATE_TIME_FORMATTER))).append(',')
+                    .append(WebJson.property("adminComment", repair.getAdminComment()))
                     .append('}');
         }
         builder.append(']');
