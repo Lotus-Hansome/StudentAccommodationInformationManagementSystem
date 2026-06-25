@@ -54,7 +54,8 @@
             <button data-view="dashboard" class="active" data-admin-only><svg><use href="#icon-dashboard"></use></svg>数据看板</button>
             <button data-view="studentHome" data-student-only><svg><use href="#icon-users"></use></svg>我的首页</button>
             <button data-view="students" data-admin-only><svg><use href="#icon-users"></use></svg>住宿信息</button>
-            <button data-view="requests"><svg><use href="#icon-swap"></use></svg>调换申请</button>
+            <button data-view="requestSubmit" data-student-only><svg><use href="#icon-plus"></use></svg>调换申请</button>
+            <button data-view="requests"><svg><use href="#icon-swap"></use></svg>申请记录</button>
             <button data-view="repairSubmit" data-student-only><svg><use href="#icon-plus"></use></svg>报修反馈</button>
             <button data-view="repairs"><svg><use href="#icon-log"></use></svg>报修记录</button>
             <button data-view="analytics" data-admin-only><svg><use href="#icon-chart"></use></svg>智能分析</button>
@@ -182,42 +183,43 @@
             </div>
         </section>
 
+        <section id="requestSubmitView" class="view">
+            <section id="requestSubmitPanel" class="panel editor-panel">
+                <div class="panel-head"><h3>提交调换申请</h3></div>
+                <form id="requestForm" class="form-grid">
+                    <label><span>学号</span><input name="studentId" required></label>
+                    <label><span>目标宿舍</span><input name="targetDormNumber" required></label>
+                    <label><span>目标电话</span><input name="targetDormPhone" required></label>
+                    <label><span>目标床位</span><input name="targetBedNumber" required></label>
+                    <label class="wide"><span>调换理由</span><textarea name="reason" rows="5" required></textarea></label>
+                    <div class="form-actions"><button class="btn primary" type="submit"><svg><use href="#icon-plus"></use></svg>提交</button></div>
+                </form>
+            </section>
+        </section>
+
         <section id="requestsView" class="view">
-            <div class="content-grid">
-                <section id="requestSubmitPanel" class="panel editor-panel">
-                    <div class="panel-head"><h3>提交调换申请</h3></div>
-                    <form id="requestForm" class="form-grid">
-                        <label><span>学号</span><input name="studentId" required></label>
-                        <label><span>目标宿舍</span><input name="targetDormNumber" required></label>
-                        <label><span>目标电话</span><input name="targetDormPhone" required></label>
-                        <label><span>目标床位</span><input name="targetBedNumber" required></label>
-                        <label class="wide"><span>调换理由</span><textarea name="reason" rows="5" required></textarea></label>
-                        <div class="form-actions"><button class="btn primary" type="submit"><svg><use href="#icon-plus"></use></svg>提交</button></div>
-                    </form>
-                    <div class="timeline-block">
-                        <h4>申请时间线</h4>
-                        <div id="requestTimeline" class="timeline-list"></div>
+            <section class="panel main-panel">
+                <div class="panel-head">
+                    <h3>调换申请记录</h3>
+                    <div class="toolbar">
+                        <button id="pendingRequestsButton" class="btn" data-admin-only>待审核</button>
+                        <button id="allRequestsButton" class="btn" data-admin-only>全部申请</button>
+                        <input id="requestStudentQuery" placeholder="学号">
+                        <button id="myRequestsButton" class="btn">查看记录</button>
                     </div>
-                </section>
-                <section class="panel main-panel">
-                    <div class="panel-head">
-                        <h3>调换申请列表</h3>
-                        <div class="toolbar">
-                            <button id="pendingRequestsButton" class="btn" data-admin-only>待审核</button>
-                            <button id="allRequestsButton" class="btn" data-admin-only>全部申请</button>
-                            <input id="requestStudentQuery" placeholder="学号">
-                            <button id="myRequestsButton" class="btn">查看记录</button>
-                        </div>
-                    </div>
-                    <div class="table-wrap">
-                        <table>
-                            <thead><tr><th>申请编号</th><th>学号</th><th>原宿舍</th><th>目标宿舍</th><th>状态</th><th>申请时间</th><th>处理时间</th><th>理由/意见</th><th>操作</th></tr></thead>
-                            <tbody id="requestsTable"></tbody>
-                        </table>
-                    </div>
-                    <div id="requestsPagination" class="pagination"></div>
-                </section>
-            </div>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>申请编号</th><th>学号</th><th>原宿舍</th><th>目标宿舍</th><th>状态</th><th>申请时间</th><th>处理时间</th><th>理由/意见</th><th>操作</th></tr></thead>
+                        <tbody id="requestsTable"></tbody>
+                    </table>
+                </div>
+                <div id="requestsPagination" class="pagination"></div>
+                <div class="timeline-block" data-student-only>
+                    <h4>申请时间线</h4>
+                    <div id="requestTimeline" class="timeline-list"></div>
+                </div>
+            </section>
         </section>
 
         <section id="repairSubmitView" class="view">

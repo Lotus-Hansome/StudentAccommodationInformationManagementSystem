@@ -41,7 +41,8 @@ const titles = {
   dashboard: ["数据看板", "实时掌握宿舍入住和调换申请状态"],
   studentHome: ["我的首页", "查看个人住宿、同宿舍成员和服务进度"],
   students: ["住宿信息", "维护学生住宿台账，支持查询、排序、分页、添加、修改和删除"],
-  requests: ["调换申请", "提交、查看、撤回与审核宿舍调换申请"],
+  requestSubmit: ["调换申请", "提交宿舍调换申请和调换理由"],
+  requests: ["申请记录", "查看、撤回与审核宿舍调换申请"],
   repairSubmit: ["报修反馈", "提交宿舍维修问题和处理诉求"],
   repairs: ["报修记录", "查看报修反馈处理进度并撤回未完成记录"],
   analytics: ["智能分析", "按楼栋或宿舍生成运营评估与建议"],
@@ -54,7 +55,7 @@ const titles = {
 };
 
 const adminViews = ["dashboard", "students", "analytics", "occupancy", "buildings", "rooms", "users", "audit", "settings"];
-const studentOnlyViews = ["studentHome", "repairSubmit"];
+const studentOnlyViews = ["studentHome", "requestSubmit", "repairSubmit"];
 
 document.addEventListener("DOMContentLoaded", () => {
   $("#loginForm").addEventListener("submit", login);
@@ -376,9 +377,9 @@ async function submitRequest(event) {
   $("#requestStudentQuery").value = state.role === "ADMIN" ? form.studentId.value : state.studentId;
   form.reset();
   if (state.role !== "ADMIN" && state.studentId) form.studentId.value = state.studentId;
-  await loadRequests("student", { studentId: $("#requestStudentQuery").value.trim() }, 1);
   if (state.role !== "ADMIN") await loadStudentHome();
   await refreshOverviewForAdmin();
+  navigate("requests");
   toast(`申请已提交：${result.id}`);
 }
 
