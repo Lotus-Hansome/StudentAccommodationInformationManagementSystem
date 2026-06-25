@@ -66,40 +66,49 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#passwordForm").addEventListener("submit", changePassword);
 
   $("#allStudentsButton").addEventListener("click", showAllStudents);
-  $("#sortStudentsButton").addEventListener("click", () => loadStudents("sorted", {}, 1));
+  $("#sortStudentsButton").addEventListener("click", sortStudents);
   $("#searchStudentButton").addEventListener("click", searchStudentById);
   $("#searchDormButton").addEventListener("click", searchDormNumber);
   $("#advancedStudentSearchButton").addEventListener("click", searchStudentsAdvanced);
   $("#studentForm").addEventListener("submit", saveStudent);
-  $("#resetStudentForm").addEventListener("click", resetStudentForm);
+  $("#resetStudentForm").addEventListener("click", () => {
+    resetStudentForm();
+    toast("住宿信息表单已重置");
+  });
 
   $("#requestForm").addEventListener("submit", submitRequest);
-  $("#pendingRequestsButton").addEventListener("click", () => loadRequests("pending", {}, 1));
-  $("#allRequestsButton").addEventListener("click", () => loadRequests("all", {}, 1));
+  $("#pendingRequestsButton").addEventListener("click", loadPendingRequests);
+  $("#allRequestsButton").addEventListener("click", loadAllRequests);
   $("#myRequestsButton").addEventListener("click", loadStudentRequests);
   $("#repairForm").addEventListener("submit", submitRepair);
-  $("#reloadRepairsButton").addEventListener("click", () => loadRepairs(1));
+  $("#reloadRepairsButton").addEventListener("click", refreshRepairs);
 
   $("#analyzeButton").addEventListener("click", analyzeDorm);
   $("#occupancyScope").addEventListener("change", updateOccupancyPlaceholder);
   $("#loadOccupancyButton").addEventListener("click", searchOccupancyDetails);
   $("#allOccupancyButton").addEventListener("click", showAllOccupancyDetails);
 
-  $("#searchBuildingsButton").addEventListener("click", loadBuildings);
+  $("#searchBuildingsButton").addEventListener("click", searchBuildings);
   $("#buildingForm").addEventListener("submit", saveBuilding);
-  $("#searchRoomsButton").addEventListener("click", loadRooms);
+  $("#searchRoomsButton").addEventListener("click", searchRooms);
   $("#roomForm").addEventListener("submit", saveRoom);
 
-  $("#reloadUsersButton").addEventListener("click", loadUsers);
+  $("#reloadUsersButton").addEventListener("click", refreshUsers);
   $("#userForm").addEventListener("submit", saveUser);
-  $("#resetUserFormButton").addEventListener("click", resetUserForm);
+  $("#resetUserFormButton").addEventListener("click", () => {
+    resetUserForm();
+    toast("账号表单已重置");
+  });
 
-  $("#searchAuditButton").addEventListener("click", () => loadAuditLogs(1));
+  $("#searchAuditButton").addEventListener("click", searchAuditLogs);
   $("#modelConfigForm").addEventListener("submit", saveModelConfig);
-  $("#reloadModelConfigButton").addEventListener("click", loadModelConfig);
+  $("#reloadModelConfigButton").addEventListener("click", refreshModelConfig);
   $("#clearModelConfigButton").addEventListener("click", clearModelConfig);
-  $("#addModelConfigButton").addEventListener("click", () => openModelConfigForm());
-  $("#cancelModelEditButton").addEventListener("click", () => setModelEditorVisible(false));
+  $("#addModelConfigButton").addEventListener("click", () => {
+    openModelConfigForm();
+    toast("请填写新的模型配置");
+  });
+  $("#cancelModelEditButton").addEventListener("click", cancelModelEdit);
   $("#modelConfigList").addEventListener("click", handleModelConfigAction);
 });
 
@@ -119,7 +128,8 @@ async function login(event) {
   toast("登录成功");
 }
 
-async function logout() {
+async function logout(options = {}) {
+  const silent = options && options.silent === true;
   const token = state.token;
   if (token) {
     try {
@@ -148,7 +158,7 @@ async function logout() {
   $("#currentUser").textContent = "";
   $("#loginForm").reset();
   closePasswordDialog();
-  toast("已退出登录");
+  if (!silent) toast("已退出登录");
 }
 
 function applyRole() {
@@ -271,26 +281,34 @@ function reloadStudents() {
   return loadStudents(state.studentMode, state.studentParams, state.studentPage);
 }
 
-function showAllStudents() {
+async function showAllStudents() {
   ["studentIdQuery", "dormQuery", "studentBuildingQuery", "departmentQuery", "classQuery", "studentKeywordQuery"].forEach((id) => {
     $(`#${id}`).value = "";
   });
-  return loadStudents("all", {}, 1);
+  await loadStudents("all", {}, 1);
+  toast("已显示全部住宿信息");
 }
 
-function searchStudentById() {
+async function sortStudents() {
+  await loadStudents("sorted", {}, 1);
+  toast("已按系/班级排序");
+}
+
+async function searchStudentById() {
   const studentId = $("#studentIdQuery").value.trim();
   if (!studentId) return toast("请输入学号");
-  loadStudents("student", { studentId }, 1);
+  await loadStudents("student", { studentId }, 1);
+  toast("学号查询完成");
 }
 
-function searchDormNumber() {
+async function searchDormNumber() {
   const dormNumber = $("#dormQuery").value.trim();
   if (!dormNumber) return toast("请输入宿舍号");
-  loadStudents("dorm", { dormNumber }, 1);
+  await loadStudents("dorm", { dormNumber }, 1);
+  toast("宿舍查询完成");
 }
 
-function searchStudentsAdvanced() {
+async function searchStudentsAdvanced() {
   const params = {
     buildingNumber: $("#studentBuildingQuery").value.trim(),
     department: $("#departmentQuery").value.trim(),
@@ -298,7 +316,8 @@ function searchStudentsAdvanced() {
     keyword: $("#studentKeywordQuery").value.trim(),
   };
   if (!Object.values(params).some(Boolean)) return toast("请输入至少一个组合查询条件");
-  loadStudents("advanced", params, 1);
+  await loadStudents("advanced", params, 1);
+  toast("组合查询完成");
 }
 
 function renderStudents() {
@@ -339,6 +358,7 @@ function editStudent(studentId) {
   form.dormNumber.value = student.dormNumber;
   form.bedNumber.value = student.bedNumber;
   $("#studentFormTitle").textContent = "编辑住宿信息";
+  toast("住宿信息已载入，可修改后保存");
 }
 
 async function saveStudent(event) {
@@ -383,10 +403,21 @@ async function submitRequest(event) {
   toast(`申请已提交：${result.id}`);
 }
 
-function loadStudentRequests() {
+async function loadPendingRequests() {
+  await loadRequests("pending", {}, 1);
+  toast("待审核申请已加载");
+}
+
+async function loadAllRequests() {
+  await loadRequests("all", {}, 1);
+  toast("全部申请已加载");
+}
+
+async function loadStudentRequests() {
   const studentId = state.role === "ADMIN" ? $("#requestStudentQuery").value.trim() : state.studentId;
   if (!studentId) return toast("请输入学号");
-  loadRequests("student", { studentId }, 1);
+  await loadRequests("student", { studentId }, 1);
+  toast("申请记录查询完成");
 }
 
 async function loadRequests(mode, params = {}, page = 1) {
@@ -483,6 +514,11 @@ async function loadRepairs(page = 1) {
   renderRepairs();
 }
 
+async function refreshRepairs() {
+  await loadRepairs(1);
+  toast("报修记录已刷新");
+}
+
 async function submitRepair(event) {
   event.preventDefault();
   const result = await api("/api/repairs", { method: "POST", body: new FormData(event.currentTarget) });
@@ -566,6 +602,7 @@ async function analyzeDorm() {
   $("#analysisVacant").textContent = statistics.vacantBeds;
   $("#statisticsText").textContent = statistics.promptText;
   $("#analysisText").textContent = data.analysis;
+  toast("智能分析建议已生成");
 }
 
 async function loadOccupancyDetails(scope, value = "") {
@@ -574,16 +611,18 @@ async function loadOccupancyDetails(scope, value = "") {
   renderOccupancyDetails(data.items);
 }
 
-function searchOccupancyDetails() {
+async function searchOccupancyDetails() {
   const scope = $("#occupancyScope").value;
   const value = $("#occupancyQuery").value.trim();
   if (!value) return toast(scope === "dorms" ? "请输入宿舍号" : "请输入楼栋号");
-  loadOccupancyDetails(scope, value);
+  await loadOccupancyDetails(scope, value);
+  toast("床位明细查询完成");
 }
 
-function showAllOccupancyDetails() {
+async function showAllOccupancyDetails() {
   $("#occupancyQuery").value = "";
-  loadOccupancyDetails($("#occupancyScope").value);
+  await loadOccupancyDetails($("#occupancyScope").value);
+  toast("全部床位明细已加载");
 }
 
 function updateOccupancyPlaceholder() {
@@ -615,6 +654,11 @@ async function loadBuildings() {
   renderBuildings();
 }
 
+async function searchBuildings() {
+  await loadBuildings();
+  toast("楼栋查询完成");
+}
+
 function renderBuildings() {
   const tbody = $("#buildingsTable");
   if (!state.buildings.length) {
@@ -643,6 +687,7 @@ function editBuilding(buildingNumber) {
   form.totalFloors.value = building.totalFloors;
   form.status.value = building.status;
   form.dataset.editing = "true";
+  toast("楼栋信息已载入，可修改后保存");
 }
 
 async function saveBuilding(event) {
@@ -664,6 +709,11 @@ async function loadRooms() {
   const data = await api(`/api/rooms?${query.toString()}`);
   state.rooms = data.rooms;
   renderRooms();
+}
+
+async function searchRooms() {
+  await loadRooms();
+  toast("宿舍查询完成");
 }
 
 function renderRooms() {
@@ -698,6 +748,7 @@ function editRoom(dormNumber) {
   form.phone.value = room.phone;
   form.status.value = room.status;
   form.dataset.editing = "true";
+  toast("宿舍信息已载入，可修改后保存");
 }
 
 async function saveRoom(event) {
@@ -716,6 +767,11 @@ async function loadUsers() {
   const data = await api("/api/users");
   state.users = data.users;
   renderUsers();
+}
+
+async function refreshUsers() {
+  await loadUsers();
+  toast("账号列表已刷新");
 }
 
 function renderUsers() {
@@ -751,6 +807,7 @@ function editUser(username) {
   form.studentId.value = user.studentId || "";
   form.enabled.checked = user.enabled;
   $("#userFormTitle").textContent = "编辑账号";
+  toast("账号信息已载入，可修改后保存");
 }
 
 function resetUserForm() {
@@ -796,6 +853,11 @@ async function loadAuditLogs(page = 1) {
   renderAuditLogs();
 }
 
+async function searchAuditLogs() {
+  await loadAuditLogs(1);
+  toast("操作日志查询完成");
+}
+
 function renderAuditLogs() {
   const tbody = $("#auditTable");
   if (!state.logs.length) {
@@ -819,6 +881,11 @@ function renderAuditLogs() {
 async function loadModelConfig() {
   const data = await api("/api/model-config");
   updateModelConfigStatus(data);
+}
+
+async function refreshModelConfig() {
+  await loadModelConfig();
+  toast("模型配置状态已刷新");
 }
 
 async function saveModelConfig(event) {
@@ -849,6 +916,7 @@ async function handleModelConfigAction(event) {
     await selectModelConfig(id);
   } else if (action === "edit") {
     openModelConfigForm(modelConfigById(id));
+    toast("模型配置已载入，可修改后保存");
   } else if (action === "copy") {
     await copyModelConfigUrl(modelConfigById(id));
   } else if (action === "delete") {
@@ -888,6 +956,11 @@ function updateModelConfigStatus(data) {
 
 function setModelEditorVisible(visible) {
   $("#modelConfigForm").classList.toggle("hidden", !visible);
+}
+
+function cancelModelEdit() {
+  setModelEditorVisible(false);
+  toast("模型配置编辑已取消");
 }
 
 function openModelConfigForm(profile = null) {
@@ -965,6 +1038,7 @@ async function copyModelConfigUrl(profile) {
     toast("接口地址已复制");
   } catch (error) {
     window.prompt("复制接口地址", url);
+    toast("请在弹窗中复制接口地址");
   }
 }
 
@@ -990,8 +1064,8 @@ async function changePassword(event) {
   event.preventDefault();
   await api("/api/users/change-password", { method: "POST", body: new FormData(event.currentTarget) });
   closePasswordDialog();
+  await logout({ silent: true });
   toast("密码已修改，请重新登录");
-  await logout();
 }
 
 function renderDepartmentBars(departments, target) {
@@ -1047,31 +1121,47 @@ function renderPagination(targetId, type, totalItems, currentPage, pageSize) {
   `;
 }
 
-function changePage(type, page) {
-  if (type === "student") return loadStudents(state.studentMode, state.studentParams, page);
-  if (type === "request") return loadRequests(state.requestMode, state.requestParams, page);
-  if (type === "repair") return loadRepairs(page);
-  if (type === "audit") return loadAuditLogs(page);
+async function changePage(type, page) {
+  if (type === "student") {
+    await loadStudents(state.studentMode, state.studentParams, page);
+  } else if (type === "request") {
+    await loadRequests(state.requestMode, state.requestParams, page);
+  } else if (type === "repair") {
+    await loadRepairs(page);
+  } else if (type === "audit") {
+    await loadAuditLogs(page);
+  } else {
+    return;
+  }
+  toast(`${paginationLabel(type)}已切换到第 ${page} 页`);
 }
 
-function changePageSize(type, pageSize) {
+async function changePageSize(type, pageSize) {
   const size = Number(pageSize);
   if (type === "student" && pageSizeOptions.includes(size)) {
     state.studentPageSize = size;
-    return loadStudents(state.studentMode, state.studentParams, 1);
-  }
-  if (type === "request" && pageSizeOptions.includes(size)) {
+    await loadStudents(state.studentMode, state.studentParams, 1);
+  } else if (type === "request" && pageSizeOptions.includes(size)) {
     state.requestPageSize = size;
-    return loadRequests(state.requestMode, state.requestParams, 1);
-  }
-  if (type === "repair" && pageSizeOptions.includes(size)) {
+    await loadRequests(state.requestMode, state.requestParams, 1);
+  } else if (type === "repair" && pageSizeOptions.includes(size)) {
     state.repairPageSize = size;
-    return loadRepairs(1);
-  }
-  if (type === "audit" && auditPageSizeOptions.includes(size)) {
+    await loadRepairs(1);
+  } else if (type === "audit" && auditPageSizeOptions.includes(size)) {
     state.auditPageSize = size;
-    return loadAuditLogs(1);
+    await loadAuditLogs(1);
+  } else {
+    return;
   }
+  toast(`${paginationLabel(type)}每页条数已更新为 ${size} 条`);
+}
+
+function paginationLabel(type) {
+  if (type === "student") return "住宿信息";
+  if (type === "request") return "申请记录";
+  if (type === "repair") return "报修记录";
+  if (type === "audit") return "操作日志";
+  return "列表";
 }
 
 function statusBadge(status, text) {
