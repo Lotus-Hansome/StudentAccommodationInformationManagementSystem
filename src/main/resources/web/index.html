@@ -37,7 +37,7 @@
         <h1>学生宿舍信息管理系统</h1>
         <p>集中住宿管理 · 调换审批 · 智能分析</p>
         <form id="loginForm" class="login-form">
-            <label><span>用户名</span><input name="username" autocomplete="username" required></label>
+            <label><span>管理员用户名 / 学号</span><input name="username" autocomplete="username" required></label>
             <label><span>密码</span><input name="password" type="password" autocomplete="current-password" required></label>
             <button class="btn primary full" type="submit"><svg><use href="#icon-login"></use></svg>登录</button>
         </form>
@@ -333,13 +333,13 @@
             <div class="content-grid">
                 <section class="panel main-panel">
                     <div class="panel-head"><h3>系统账号</h3><button id="reloadUsersButton" class="btn">刷新</button></div>
-                    <div class="table-wrap"><table><thead><tr><th>用户名</th><th>角色</th><th>绑定学号</th><th>状态</th><th>操作</th></tr></thead><tbody id="usersTable"></tbody></table></div>
+                    <div class="table-wrap"><table><thead><tr><th>登录账号</th><th>角色</th><th>绑定学号</th><th>状态</th><th>操作</th></tr></thead><tbody id="usersTable"></tbody></table></div>
                 </section>
                 <aside class="panel editor-panel">
                     <div class="panel-head"><h3 id="userFormTitle">新增账号</h3></div>
                     <form id="userForm" class="form-grid">
                         <input type="hidden" name="mode" value="create">
-                        <label><span>用户名</span><input name="username" required></label>
+                        <label id="userUsernameRow"><span>管理员用户名</span><input name="username"></label>
                         <label id="userPasswordRow"><span>初始密码</span><input name="password" type="password"></label>
                         <label><span>角色</span><select name="role"><option value="USER">普通用户</option><option value="ADMIN">管理员</option></select></label>
                         <label id="userStudentIdRow"><span>绑定学号</span><input name="studentId" required></label>

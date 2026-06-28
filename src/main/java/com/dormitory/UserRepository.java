@@ -7,6 +7,8 @@ import java.util.Optional;
 public interface UserRepository {
     Optional<User> findByUsername(String username) throws IOException;
 
+    Optional<User> findByLoginId(String loginId) throws IOException;
+
     List<User> listAll() throws IOException;
 
     void create(User user) throws IOException;

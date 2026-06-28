@@ -20,17 +20,21 @@ public class UserService {
     }
 
     public void create(String username, String password, String role, String studentId, boolean enabled) {
-        String normalizedUsername = normalizeText(username);
+        String requestedUsername = normalizeText(username);
         String normalizedPassword = normalizeText(password);
         UserRole userRole = parseRole(role);
-        if (normalizedUsername.isBlank() || normalizedPassword.isBlank()) {
-            throw new IllegalArgumentException("用户名和初始密码不能为空。");
+        if (normalizedPassword.isBlank()) {
+            throw new IllegalArgumentException("初始密码不能为空。");
+        }
+        if (userRole == UserRole.ADMIN && requestedUsername.isBlank()) {
+            throw new IllegalArgumentException("管理员用户名不能为空。");
         }
         try {
+            String normalizedStudentId = validateStudentBinding(userRole, studentId, "");
+            String normalizedUsername = userRole == UserRole.USER ? normalizedStudentId : requestedUsername;
             if (repository.findByUsername(normalizedUsername).isPresent()) {
-                throw new IllegalArgumentException("用户名已存在。");
+                throw new IllegalArgumentException(userRole == UserRole.USER ? "该学号的学生账号已存在。" : "用户名已存在。");
             }
-            String normalizedStudentId = validateStudentBinding(userRole, studentId, normalizedUsername);
             repository.create(new User(
                     normalizedUsername,
                     PasswordHasher.hash(normalizedPassword),

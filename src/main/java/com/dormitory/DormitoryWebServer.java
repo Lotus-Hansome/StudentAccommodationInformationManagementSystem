@@ -206,7 +206,7 @@ public class DormitoryWebServer {
         Optional<User> user = authService.login(username, password);
         if (user.isEmpty()) {
             recordLoginFailure(key);
-            throw new ApiException(401, "用户名或密码错误，或账号已被禁用。");
+            throw new ApiException(401, "登录账号或密码错误，或账号已被禁用。");
         }
         loginAttempts.remove(key);
         String token = UUID.randomUUID().toString();

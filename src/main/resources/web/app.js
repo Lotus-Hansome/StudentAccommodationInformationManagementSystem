@@ -784,14 +784,14 @@ function renderUsers() {
   }
   tbody.innerHTML = state.users.map((user) => `
     <tr>
-      <td>${escapeHtml(user.username)}</td>
+      <td>${escapeHtml(user.role === "ADMIN" ? user.username : user.studentId)}</td>
       <td>${user.role === "ADMIN" ? "管理员" : "普通用户"}</td>
       <td>${user.role === "ADMIN" ? "--" : escapeHtml(user.studentId || "")}</td>
       <td>${user.enabled ? statusText("ACTIVE") : statusText("DISABLED")}</td>
       <td><div class="row-actions">
         <button class="btn" onclick="editUser('${escapeJs(user.username)}')"><svg><use href="#icon-edit"></use></svg>编辑</button>
-        <button class="btn" onclick="resetUserPassword('${escapeJs(user.username)}')"><svg><use href="#icon-key"></use></svg>重置密码</button>
-        ${user.username === state.username ? "" : `<button class="btn danger" onclick="deleteUser('${escapeJs(user.username)}')"><svg><use href="#icon-trash"></use></svg>删除</button>`}
+        <button class="btn" onclick="resetUserPassword('${escapeJs(user.username)}','${escapeJs(user.role === "ADMIN" ? user.username : user.studentId)}')"><svg><use href="#icon-key"></use></svg>重置密码</button>
+        ${user.username === state.username ? "" : `<button class="btn danger" onclick="deleteUser('${escapeJs(user.username)}','${escapeJs(user.role === "ADMIN" ? user.username : user.studentId)}')"><svg><use href="#icon-trash"></use></svg>删除</button>`}
       </div></td>
     </tr>
   `).join("");
@@ -828,7 +828,11 @@ function resetUserForm() {
 function updateUserRoleFields() {
   const form = $("#userForm");
   const isAdmin = form.role.value === "ADMIN";
+  const isEditing = form.mode.value === "edit";
+  $("#userUsernameRow").classList.toggle("hidden", !isAdmin);
   $("#userStudentIdRow").classList.toggle("hidden", isAdmin);
+  form.username.disabled = !isAdmin && !isEditing;
+  form.username.required = isAdmin;
   form.studentId.disabled = isAdmin;
   form.studentId.required = !isAdmin;
   if (isAdmin) form.studentId.value = "";
@@ -844,8 +848,8 @@ async function saveUser(event) {
   toast("账号已保存");
 }
 
-async function deleteUser(username) {
-  if (!confirm(`确认删除账号 ${username} 吗？删除后该账号将无法登录。`)) return;
+async function deleteUser(username, loginId = username) {
+  if (!confirm(`确认删除账号 ${loginId} 吗？删除后该账号将无法登录。`)) return;
   const query = new URLSearchParams({ username });
   await api(`/api/users?${query.toString()}`, { method: "DELETE" });
   const form = $("#userForm");
@@ -856,8 +860,8 @@ async function deleteUser(username) {
   toast("账号已删除");
 }
 
-async function resetUserPassword(username) {
-  const newPassword = prompt(`请输入 ${username} 的新密码：`);
+async function resetUserPassword(username, loginId = username) {
+  const newPassword = prompt(`请输入 ${loginId} 的新密码：`);
   if (newPassword === null) return;
   if (newPassword.trim().length < 6) return toast("新密码至少需要 6 位");
   const body = new FormData();

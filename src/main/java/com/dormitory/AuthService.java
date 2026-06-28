@@ -16,9 +16,9 @@ public class AuthService {
         this.repository = repository;
     }
 
-    public Optional<User> login(String username, String password) {
+    public Optional<User> login(String loginId, String password) {
         try {
-            Optional<User> user = repository.findByUsername(normalizeText(username));
+            Optional<User> user = repository.findByLoginId(normalizeText(loginId));
             if (user.isEmpty() || !user.get().isEnabled()) {
                 return Optional.empty();
             }
@@ -48,6 +48,15 @@ public class AuthService {
         public Optional<User> findByUsername(String username) {
             return users.stream()
                     .filter(user -> user.getUsername().equalsIgnoreCase(username))
+                    .findFirst();
+        }
+
+        @Override
+        public Optional<User> findByLoginId(String loginId) {
+            return users.stream()
+                    .filter(user -> user.getUsername().equalsIgnoreCase(loginId)
+                            || (user.getRole() == UserRole.USER
+                            && user.getStudentId().equalsIgnoreCase(loginId)))
                     .findFirst();
         }
 

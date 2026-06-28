@@ -68,7 +68,8 @@ public final class SmokeTestRunner {
         require(repairService.listByStudentId("T001").stream().anyMatch(item -> item.getStatus() == RepairStatus.CANCELED),
                 "student should be able to cancel an active repair report");
 
-        UserService userService = new UserService(new InMemoryUserRepository());
+        InMemoryUserRepository userRepository = new InMemoryUserRepository();
+        UserService userService = new UserService(userRepository);
         userService.create("admin2", "admin234", "ADMIN", "", true);
         long enabledAdmins = userService.listAll().stream()
                 .filter(user -> user.getRole() == UserRole.ADMIN && user.isEnabled())
@@ -83,12 +84,17 @@ public final class SmokeTestRunner {
         expectFailure(
                 () -> userService.delete("admin", "admin"),
                 "current administrator should not be deletable");
-        userService.create("student2", "student234", "USER", "T003", true);
+        userService.create("ignored-student-name", "student234", "USER", "T003", true);
+        require(userService.listAll().stream()
+                        .anyMatch(user -> user.getUsername().equals("T003") && user.getStudentId().equals("T003")),
+                "student username should be generated from the student id");
+        require(new AuthService(userRepository).login("T003", "student234").isPresent(),
+                "student should be able to log in with the student id");
         expectFailure(
                 () -> userService.create("student3", "student345", "USER", "T003", true),
                 "a student should only be bound to one account");
-        userService.delete("student2", "admin");
-        require(userService.listAll().stream().noneMatch(user -> user.getUsername().equals("student2")),
+        userService.delete("T003", "admin");
+        require(userService.listAll().stream().noneMatch(user -> user.getUsername().equals("T003")),
                 "ordinary user should be deletable");
         userService.update("admin", "USER", "T001", true, "admin");
         expectFailure(
@@ -127,6 +133,15 @@ public final class SmokeTestRunner {
         public Optional<User> findByUsername(String username) {
             return users.stream()
                     .filter(user -> user.getUsername().equalsIgnoreCase(username))
+                    .findFirst();
+        }
+
+        @Override
+        public Optional<User> findByLoginId(String loginId) {
+            return users.stream()
+                    .filter(user -> user.getUsername().equalsIgnoreCase(loginId)
+                            || (user.getRole() == UserRole.USER
+                            && user.getStudentId().equalsIgnoreCase(loginId)))
                     .findFirst();
         }
 

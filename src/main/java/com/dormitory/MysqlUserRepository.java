@@ -39,6 +39,31 @@ public class MysqlUserRepository implements UserRepository {
     }
 
     @Override
+    public Optional<User> findByLoginId(String loginId) throws IOException {
+        String sql = """
+                SELECT username, password_hash, role, student_id, enabled
+                FROM users
+                WHERE username = ? OR (role = 'USER' AND student_id = ?)
+                ORDER BY CASE WHEN username = ? THEN 0 ELSE 1 END
+                LIMIT 1
+                """;
+        try (Connection connection = connectionFactory.openConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, loginId);
+            statement.setString(2, loginId);
+            statement.setString(3, loginId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (resultSet.next()) {
+                    return Optional.of(readUser(resultSet));
+                }
+                return Optional.empty();
+            }
+        } catch (SQLException e) {
+            throw new IOException("读取登录账号失败：" + e.getMessage(), e);
+        }
+    }
+
+    @Override
     public List<User> listAll() throws IOException {
         String sql = """
                 SELECT username, password_hash, role, student_id, enabled
