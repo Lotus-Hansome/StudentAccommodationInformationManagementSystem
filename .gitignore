@@ -1,6 +1,7 @@
 out/
 build/
 lib/
+data/
 config/database.properties
 config/model.properties
 *.class
