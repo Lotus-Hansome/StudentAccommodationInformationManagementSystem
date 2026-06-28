@@ -68,6 +68,11 @@ public class AuthService {
         }
 
         @Override
+        public void delete(String username) {
+            users.removeIf(user -> user.getUsername().equalsIgnoreCase(username));
+        }
+
+        @Override
         public void updatePassword(String username, String passwordHash) {
             findByUsername(username).ifPresent(user -> update(new User(
                     user.getUsername(),

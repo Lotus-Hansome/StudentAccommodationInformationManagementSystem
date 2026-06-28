@@ -95,6 +95,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   $("#reloadUsersButton").addEventListener("click", refreshUsers);
   $("#userForm").addEventListener("submit", saveUser);
+  $("#userForm [name='role']").addEventListener("change", updateUserRoleFields);
   $("#resetUserFormButton").addEventListener("click", () => {
     resetUserForm();
     toast("账号表单已重置");
@@ -110,6 +111,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   $("#cancelModelEditButton").addEventListener("click", cancelModelEdit);
   $("#modelConfigList").addEventListener("click", handleModelConfigAction);
+  updateUserRoleFields();
 });
 
 async function login(event) {
@@ -784,11 +786,12 @@ function renderUsers() {
     <tr>
       <td>${escapeHtml(user.username)}</td>
       <td>${user.role === "ADMIN" ? "管理员" : "普通用户"}</td>
-      <td>${escapeHtml(user.studentId || "")}</td>
+      <td>${user.role === "ADMIN" ? "--" : escapeHtml(user.studentId || "")}</td>
       <td>${user.enabled ? statusText("ACTIVE") : statusText("DISABLED")}</td>
       <td><div class="row-actions">
         <button class="btn" onclick="editUser('${escapeJs(user.username)}')"><svg><use href="#icon-edit"></use></svg>编辑</button>
         <button class="btn" onclick="resetUserPassword('${escapeJs(user.username)}')"><svg><use href="#icon-key"></use></svg>重置密码</button>
+        ${user.username === state.username ? "" : `<button class="btn danger" onclick="deleteUser('${escapeJs(user.username)}')"><svg><use href="#icon-trash"></use></svg>删除</button>`}
       </div></td>
     </tr>
   `).join("");
@@ -805,6 +808,7 @@ function editUser(username) {
   $("#userPasswordRow").classList.add("hidden");
   form.role.value = user.role;
   form.studentId.value = user.studentId || "";
+  updateUserRoleFields();
   form.enabled.checked = user.enabled;
   $("#userFormTitle").textContent = "编辑账号";
   toast("账号信息已载入，可修改后保存");
@@ -818,6 +822,16 @@ function resetUserForm() {
   $("#userPasswordRow").classList.remove("hidden");
   form.enabled.checked = true;
   $("#userFormTitle").textContent = "新增账号";
+  updateUserRoleFields();
+}
+
+function updateUserRoleFields() {
+  const form = $("#userForm");
+  const isAdmin = form.role.value === "ADMIN";
+  $("#userStudentIdRow").classList.toggle("hidden", isAdmin);
+  form.studentId.disabled = isAdmin;
+  form.studentId.required = !isAdmin;
+  if (isAdmin) form.studentId.value = "";
 }
 
 async function saveUser(event) {
@@ -828,6 +842,18 @@ async function saveUser(event) {
   resetUserForm();
   await loadUsers();
   toast("账号已保存");
+}
+
+async function deleteUser(username) {
+  if (!confirm(`确认删除账号 ${username} 吗？删除后该账号将无法登录。`)) return;
+  const query = new URLSearchParams({ username });
+  await api(`/api/users?${query.toString()}`, { method: "DELETE" });
+  const form = $("#userForm");
+  if (form.mode.value === "edit" && form.username.value === username) {
+    resetUserForm();
+  }
+  await loadUsers();
+  toast("账号已删除");
 }
 
 async function resetUserPassword(username) {

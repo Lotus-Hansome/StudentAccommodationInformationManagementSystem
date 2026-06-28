@@ -531,6 +531,16 @@ public class DormitoryWebServer {
             sendJson(exchange, 200, "{\"success\":true,\"message\":\"用户已更新。\"}");
             return;
         }
+        if ("DELETE".equalsIgnoreCase(method)) {
+            Map<String, String> query = parseQuery(exchange.getRequestURI().getRawQuery());
+            String username = query.getOrDefault("username", "");
+            userService.delete(username, admin.getUsername());
+            sessions.entrySet().removeIf(entry ->
+                    entry.getValue().user.getUsername().equalsIgnoreCase(username.trim()));
+            operationLogService.record(admin.getUsername(), "DELETE_USER", "user", username, "删除系统账号");
+            sendJson(exchange, 200, "{\"success\":true,\"message\":\"用户已删除。\"}");
+            return;
+        }
         throw new ApiException(405, "请求方法不支持。");
     }
 

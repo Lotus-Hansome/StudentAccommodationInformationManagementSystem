@@ -74,6 +74,22 @@ public final class SmokeTestRunner {
                 .filter(user -> user.getRole() == UserRole.ADMIN && user.isEnabled())
                 .count();
         require(enabledAdmins == 2, "system should allow multiple administrators");
+        expectFailure(
+                () -> userService.create("invalid-admin", "admin234", "ADMIN", "T001", true),
+                "administrator should not be bound to a student");
+        expectFailure(
+                () -> userService.update("admin2", "ADMIN", "T002", true, "admin"),
+                "administrator update should reject a student binding");
+        expectFailure(
+                () -> userService.delete("admin", "admin"),
+                "current administrator should not be deletable");
+        userService.create("student2", "student234", "USER", "T003", true);
+        expectFailure(
+                () -> userService.create("student3", "student345", "USER", "T003", true),
+                "a student should only be bound to one account");
+        userService.delete("student2", "admin");
+        require(userService.listAll().stream().noneMatch(user -> user.getUsername().equals("student2")),
+                "ordinary user should be deletable");
         userService.update("admin", "USER", "T001", true, "admin");
         expectFailure(
                 () -> userService.update("admin2", "USER", "T002", true, "admin2"),
@@ -81,6 +97,9 @@ public final class SmokeTestRunner {
         expectFailure(
                 () -> userService.update("admin2", "ADMIN", "", false, "admin"),
                 "last enabled administrator should not be disabled");
+        expectFailure(
+                () -> userService.delete("admin2", "admin"),
+                "last enabled administrator should not be deleted");
 
         DormStatistics statistics = studentService.statisticsByBuilding("9");
         String analysis = new LocalRuleDormAnalyzer().analyze(statistics);
@@ -125,6 +144,11 @@ public final class SmokeTestRunner {
         public void update(User user) {
             users.removeIf(item -> item.getUsername().equalsIgnoreCase(user.getUsername()));
             users.add(user);
+        }
+
+        @Override
+        public void delete(String username) {
+            users.removeIf(user -> user.getUsername().equalsIgnoreCase(username));
         }
 
         @Override

@@ -93,6 +93,18 @@ public class MysqlUserRepository implements UserRepository {
     }
 
     @Override
+    public void delete(String username) throws IOException {
+        String sql = "DELETE FROM users WHERE username = ?";
+        try (Connection connection = connectionFactory.openConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, username);
+            statement.executeUpdate();
+        } catch (SQLException e) {
+            throw new IOException("删除用户失败：" + e.getMessage(), e);
+        }
+    }
+
+    @Override
     public void updatePassword(String username, String passwordHash) throws IOException {
         String sql = "UPDATE users SET password_hash = ? WHERE username = ?";
         try (Connection connection = connectionFactory.openConnection();

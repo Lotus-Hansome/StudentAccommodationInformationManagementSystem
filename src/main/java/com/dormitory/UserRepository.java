@@ -13,6 +13,8 @@ public interface UserRepository {
 
     void update(User user) throws IOException;
 
+    void delete(String username) throws IOException;
+
     void updatePassword(String username, String passwordHash) throws IOException;
 
     void updateLastLogin(String username) throws IOException;

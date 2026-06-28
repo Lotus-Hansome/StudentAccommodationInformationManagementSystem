@@ -26,18 +26,16 @@ public class UserService {
         if (normalizedUsername.isBlank() || normalizedPassword.isBlank()) {
             throw new IllegalArgumentException("用户名和初始密码不能为空。");
         }
-        if (userRole == UserRole.USER && normalizeText(studentId).isBlank()) {
-            throw new IllegalArgumentException("普通用户必须绑定学号。");
-        }
         try {
             if (repository.findByUsername(normalizedUsername).isPresent()) {
                 throw new IllegalArgumentException("用户名已存在。");
             }
+            String normalizedStudentId = validateStudentBinding(userRole, studentId, normalizedUsername);
             repository.create(new User(
                     normalizedUsername,
                     PasswordHasher.hash(normalizedPassword),
                     userRole,
-                    normalizeText(studentId),
+                    normalizedStudentId,
                     enabled));
         } catch (IOException e) {
             throw new IllegalStateException("创建用户失败：" + e.getMessage(), e);
@@ -53,9 +51,6 @@ public class UserService {
         if (normalizedUsername.equalsIgnoreCase(currentUsername) && !enabled) {
             throw new IllegalArgumentException("不能禁用当前登录账号。");
         }
-        if (userRole == UserRole.USER && normalizeText(studentId).isBlank()) {
-            throw new IllegalArgumentException("普通用户必须绑定学号。");
-        }
         try {
             User existing = repository.findByUsername(normalizedUsername)
                     .orElseThrow(() -> new IllegalArgumentException("用户不存在。"));
@@ -65,14 +60,35 @@ public class UserService {
                     && !hasOtherEnabledAdmin(existing.getUsername())) {
                 throw new IllegalArgumentException("系统至少需要保留一个启用的管理员账号。");
             }
+            String normalizedStudentId = validateStudentBinding(userRole, studentId, normalizedUsername);
             repository.update(new User(
                     existing.getUsername(),
                     existing.getPasswordHash(),
                     userRole,
-                    normalizeText(studentId),
+                    normalizedStudentId,
                     enabled));
         } catch (IOException e) {
             throw new IllegalStateException("更新用户失败：" + e.getMessage(), e);
+        }
+    }
+
+    public void delete(String username, String currentUsername) {
+        String normalizedUsername = normalizeText(username);
+        if (normalizedUsername.isBlank()) {
+            throw new IllegalArgumentException("用户名不能为空。");
+        }
+        if (normalizedUsername.equalsIgnoreCase(normalizeText(currentUsername))) {
+            throw new IllegalArgumentException("不能删除当前登录账号。");
+        }
+        try {
+            User existing = repository.findByUsername(normalizedUsername)
+                    .orElseThrow(() -> new IllegalArgumentException("用户不存在。"));
+            if (existing.getRole() == UserRole.ADMIN && !hasOtherEnabledAdmin(existing.getUsername())) {
+                throw new IllegalArgumentException("系统至少需要保留一个启用的管理员账号。");
+            }
+            repository.delete(existing.getUsername());
+        } catch (IOException e) {
+            throw new IllegalStateException("删除用户失败：" + e.getMessage(), e);
         }
     }
 
@@ -119,6 +135,26 @@ public class UserService {
                 .anyMatch(user -> !user.getUsername().equalsIgnoreCase(username)
                         && user.getRole() == UserRole.ADMIN
                         && user.isEnabled());
+    }
+
+    private String validateStudentBinding(UserRole role, String studentId, String username) throws IOException {
+        String normalizedStudentId = normalizeText(studentId);
+        if (role == UserRole.ADMIN) {
+            if (!normalizedStudentId.isBlank()) {
+                throw new IllegalArgumentException("管理员账号不能绑定学号。");
+            }
+            return "";
+        }
+        if (normalizedStudentId.isBlank()) {
+            throw new IllegalArgumentException("普通用户必须绑定学号。");
+        }
+        boolean alreadyBound = repository.listAll().stream()
+                .anyMatch(user -> !user.getUsername().equalsIgnoreCase(username)
+                        && user.getStudentId().equalsIgnoreCase(normalizedStudentId));
+        if (alreadyBound) {
+            throw new IllegalArgumentException("该学号已绑定其他账号。");
+        }
+        return normalizedStudentId;
     }
 
     private String normalizeText(String value) {

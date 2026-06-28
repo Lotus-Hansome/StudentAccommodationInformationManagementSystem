@@ -106,9 +106,14 @@ public class MysqlDatabaseInitializer {
                         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                         last_login_at DATETIME NULL,
                         KEY idx_user_role (role),
-                        KEY idx_user_student (student_id)
+                        UNIQUE KEY uk_user_student (student_id),
+                        CONSTRAINT chk_user_student_binding CHECK (
+                            (role = 'ADMIN' AND student_id IS NULL)
+                            OR (role = 'USER' AND student_id IS NOT NULL)
+                        )
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
                     """);
+            statement.executeUpdate("UPDATE users SET student_id = NULL WHERE role = 'ADMIN'");
             statement.executeUpdate("""
                     CREATE TABLE IF NOT EXISTS operation_logs (
                         id BIGINT AUTO_INCREMENT PRIMARY KEY,
