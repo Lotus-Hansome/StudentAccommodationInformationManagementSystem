@@ -726,20 +726,30 @@ function renderRooms() {
     tbody.innerHTML = `<tr><td colspan="10">暂无宿舍</td></tr>`;
     return;
   }
-  tbody.innerHTML = state.rooms.map((room) => `
-    <tr>
-      <td>${escapeHtml(room.dormNumber)}</td>
-      <td>${escapeHtml(room.buildingNumber)}</td>
-      <td>${room.floorNumber}</td>
-      <td>${room.capacity}</td>
-      <td>${room.occupiedBeds}</td>
-      <td><div class="bed-availability"><strong>${room.vacantBeds} 个</strong><span>${room.vacantBedNumbers.length ? `${room.vacantBedNumbers.map((bed) => `${escapeHtml(bed)}号`).join("、")}` : (room.status === "ACTIVE" ? "无空余" : "不可分配")}</span></div></td>
-      <td>${room.lockedBeds || 0}</td>
-      <td>${escapeHtml(room.phone)}</td>
-      <td>${statusText(room.status)}</td>
-      <td><button class="btn" onclick="editRoom('${escapeJs(room.dormNumber)}')"><svg><use href="#icon-edit"></use></svg>编辑</button></td>
-    </tr>
-  `).join("");
+  tbody.innerHTML = state.rooms.map((room) => {
+    const supportsBedAvailability = Array.isArray(room.vacantBedNumbers)
+      && Number.isFinite(Number(room.vacantBeds));
+    const vacantBeds = supportsBedAvailability ? Number(room.vacantBeds) : "--";
+    const vacancyDetail = supportsBedAvailability
+      ? (room.vacantBedNumbers.length
+        ? room.vacantBedNumbers.map((bed) => `${escapeHtml(bed)}号`).join("、")
+        : (room.status === "ACTIVE" ? "无空余" : "不可分配"))
+      : "请重启服务后查看";
+    return `
+      <tr>
+        <td>${escapeHtml(room.dormNumber)}</td>
+        <td>${escapeHtml(room.buildingNumber)}</td>
+        <td>${room.floorNumber}</td>
+        <td>${room.capacity}</td>
+        <td>${Number.isFinite(Number(room.occupiedBeds)) ? room.occupiedBeds : "--"}</td>
+        <td><div class="bed-availability"><strong>${vacantBeds}${supportsBedAvailability ? " 个" : ""}</strong><span>${vacancyDetail}</span></div></td>
+        <td>${Number.isFinite(Number(room.lockedBeds)) ? room.lockedBeds : "--"}</td>
+        <td>${escapeHtml(room.phone)}</td>
+        <td>${statusText(room.status)}</td>
+        <td><button class="btn" onclick="editRoom('${escapeJs(room.dormNumber)}')"><svg><use href="#icon-edit"></use></svg>编辑</button></td>
+      </tr>
+    `;
+  }).join("");
 }
 
 function editRoom(dormNumber) {
