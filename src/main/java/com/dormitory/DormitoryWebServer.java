@@ -470,10 +470,15 @@ public class DormitoryWebServer {
         List<DormOccupancySummary> summaries = "dorms".equals(scope)
                 ? studentDormService.dormOccupancySummaries(value)
                 : studentDormService.buildingOccupancySummaries(value);
+        PageResult<DormOccupancySummary> result = paginate(
+                summaries,
+                parseInt(query.get("page"), 1),
+                parseInt(query.get("pageSize"), 10));
         sendJson(exchange, 200, "{"
                 + WebJson.booleanProperty("success", true) + ","
                 + WebJson.property("scope", scope) + ","
-                + "\"items\":" + occupancyJson(summaries)
+                + "\"items\":" + occupancyJson(result.getItems()) + ","
+                + pageJson(result)
                 + "}");
     }
 
@@ -481,7 +486,15 @@ public class DormitoryWebServer {
         User admin = requireAdmin(exchange);
         if ("GET".equalsIgnoreCase(method)) {
             Map<String, String> query = parseQuery(exchange.getRequestURI().getRawQuery());
-            sendJson(exchange, 200, "{\"success\":true,\"buildings\":" + buildingsJson(infrastructureService.listBuildings(query.getOrDefault("keyword", ""))) + "}");
+            PageResult<Building> result = paginate(
+                    infrastructureService.listBuildings(query.getOrDefault("keyword", "")),
+                    parseInt(query.get("page"), 1),
+                    parseInt(query.get("pageSize"), 10));
+            sendJson(exchange, 200, "{"
+                    + WebJson.booleanProperty("success", true) + ","
+                    + "\"buildings\":" + buildingsJson(result.getItems()) + ","
+                    + pageJson(result)
+                    + "}");
             return;
         }
         if ("POST".equalsIgnoreCase(method) || "PUT".equalsIgnoreCase(method)) {
@@ -526,7 +539,16 @@ public class DormitoryWebServer {
     private void users(HttpExchange exchange, String method) throws IOException {
         User admin = requireAdmin(exchange);
         if ("GET".equalsIgnoreCase(method)) {
-            sendJson(exchange, 200, "{\"success\":true,\"users\":" + usersJson(userService.listAll()) + "}");
+            Map<String, String> query = parseQuery(exchange.getRequestURI().getRawQuery());
+            PageResult<User> result = paginate(
+                    userService.listAll(),
+                    parseInt(query.get("page"), 1),
+                    parseInt(query.get("pageSize"), 10));
+            sendJson(exchange, 200, "{"
+                    + WebJson.booleanProperty("success", true) + ","
+                    + "\"users\":" + usersJson(result.getItems()) + ","
+                    + pageJson(result)
+                    + "}");
             return;
         }
         if ("POST".equalsIgnoreCase(method)) {

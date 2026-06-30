@@ -20,8 +20,21 @@ const state = {
   repairPage: 1,
   repairPageSize: 10,
   homeData: null,
+  occupancyItems: [],
+  occupancyTotal: 0,
+  occupancyPage: 1,
+  occupancyPageSize: 10,
+  occupancyScope: "buildings",
+  occupancyValue: "",
   users: [],
+  userTotal: 0,
+  userPage: 1,
+  userPageSize: 10,
   buildings: [],
+  buildingTotal: 0,
+  buildingPage: 1,
+  buildingPageSize: 10,
+  buildingKeyword: "",
   rooms: [],
   roomTotal: 0,
   roomPage: 1,
@@ -33,6 +46,8 @@ const state = {
   auditPageSize: 20,
   auditKeyword: "",
   modelConfig: null,
+  modelPage: 1,
+  modelPageSize: 10,
 };
 
 const pageSizeOptions = [10, 20, 50];
@@ -152,7 +167,13 @@ async function logout(options = {}) {
     students: [],
     requests: [],
     users: [],
+    userTotal: 0,
+    userPage: 1,
+    userPageSize: 10,
     buildings: [],
+    buildingTotal: 0,
+    buildingPage: 1,
+    buildingPageSize: 10,
     rooms: [],
     roomTotal: 0,
     roomPage: 1,
@@ -160,7 +181,16 @@ async function logout(options = {}) {
     roomParams: {},
     logs: [],
     repairs: [],
+    occupancyItems: [],
+    occupancyTotal: 0,
+    occupancyPage: 1,
+    occupancyPageSize: 10,
+    occupancyScope: "buildings",
+    occupancyValue: "",
     homeData: null,
+    modelConfig: null,
+    modelPage: 1,
+    modelPageSize: 10,
   });
   $("#appShell").classList.add("hidden");
   $("#loginPage").classList.remove("hidden");
@@ -213,11 +243,11 @@ function navigate(view) {
   if (view === "repairs") loadRepairs(1);
   if (view === "occupancy") {
     updateOccupancyPlaceholder();
-    loadOccupancyDetails($("#occupancyScope").value, $("#occupancyQuery").value.trim());
+    loadOccupancyDetails($("#occupancyScope").value, $("#occupancyQuery").value.trim(), 1);
   }
-  if (view === "buildings") loadBuildings();
+  if (view === "buildings") loadBuildings(1);
   if (view === "rooms") loadRooms(1);
-  if (view === "users") loadUsers();
+  if (view === "users") loadUsers(1);
   if (view === "audit") loadAuditLogs(1);
   if (view === "settings") loadModelConfig();
 }
@@ -616,23 +646,49 @@ async function analyzeDorm() {
   toast("智能分析建议已生成");
 }
 
-async function loadOccupancyDetails(scope, value = "") {
-  const query = new URLSearchParams({ scope, value });
+async function loadOccupancyDetails(scope, value = "", page = 1) {
+  state.occupancyScope = scope;
+  state.occupancyValue = value;
+  const query = new URLSearchParams({
+    scope,
+    value,
+    page,
+    pageSize: state.occupancyPageSize,
+  });
   const data = await api(`/api/occupancy?${query.toString()}`);
-  renderOccupancyDetails(data.items);
+  const serverPaged = isPagedResponse(data);
+  if (serverPaged) {
+    state.occupancyItems = data.items;
+    state.occupancyTotal = Number(data.total);
+    state.occupancyPage = Number(data.page);
+    state.occupancyPageSize = Number(data.pageSize);
+  } else {
+    state.occupancyTotal = data.items.length;
+    state.occupancyPage = page;
+    const from = (page - 1) * state.occupancyPageSize;
+    state.occupancyItems = data.items.slice(from, from + state.occupancyPageSize);
+  }
+  renderOccupancyDetails(state.occupancyItems);
+  renderPagination(
+    "occupancyPagination",
+    "occupancy",
+    state.occupancyTotal,
+    state.occupancyPage,
+    state.occupancyPageSize
+  );
 }
 
 async function searchOccupancyDetails() {
   const scope = $("#occupancyScope").value;
   const value = $("#occupancyQuery").value.trim();
   if (!value) return toast(scope === "dorms" ? "请输入宿舍号" : "请输入楼栋号");
-  await loadOccupancyDetails(scope, value);
+  await loadOccupancyDetails(scope, value, 1);
   toast("床位明细查询完成");
 }
 
 async function showAllOccupancyDetails() {
   $("#occupancyQuery").value = "";
-  await loadOccupancyDetails($("#occupancyScope").value);
+  await loadOccupancyDetails($("#occupancyScope").value, "", 1);
   toast("全部床位明细已加载");
 }
 
@@ -658,15 +714,37 @@ function renderOccupancyDetails(items) {
   `).join("");
 }
 
-async function loadBuildings() {
-  const query = new URLSearchParams({ keyword: $("#buildingKeyword").value.trim() });
+async function loadBuildings(page = 1, keyword = null) {
+  if (keyword !== null) state.buildingKeyword = keyword;
+  const query = new URLSearchParams({
+    keyword: state.buildingKeyword,
+    page,
+    pageSize: state.buildingPageSize,
+  });
   const data = await api(`/api/buildings?${query.toString()}`);
-  state.buildings = data.buildings;
+  if (isPagedResponse(data)) {
+    state.buildings = data.buildings;
+    state.buildingTotal = Number(data.total);
+    state.buildingPage = Number(data.page);
+    state.buildingPageSize = Number(data.pageSize);
+  } else {
+    state.buildingTotal = data.buildings.length;
+    state.buildingPage = page;
+    const from = (page - 1) * state.buildingPageSize;
+    state.buildings = data.buildings.slice(from, from + state.buildingPageSize);
+  }
   renderBuildings();
+  renderPagination(
+    "buildingsPagination",
+    "building",
+    state.buildingTotal,
+    state.buildingPage,
+    state.buildingPageSize
+  );
 }
 
 async function searchBuildings() {
-  await loadBuildings();
+  await loadBuildings(1, $("#buildingKeyword").value.trim());
   toast("楼栋查询完成");
 }
 
@@ -710,7 +788,7 @@ async function saveBuilding(event) {
   form.reset();
   form.dataset.editing = "";
   form.totalFloors.value = 6;
-  await loadBuildings();
+  await loadBuildings(state.buildingPage);
 }
 
 async function loadRooms(page = 1, params = null) {
@@ -808,14 +886,26 @@ async function saveRoom(event) {
   await loadRooms(state.roomPage);
 }
 
-async function loadUsers() {
-  const data = await api("/api/users");
-  state.users = data.users;
+async function loadUsers(page = 1) {
+  const query = new URLSearchParams({ page, pageSize: state.userPageSize });
+  const data = await api(`/api/users?${query.toString()}`);
+  if (isPagedResponse(data)) {
+    state.users = data.users;
+    state.userTotal = Number(data.total);
+    state.userPage = Number(data.page);
+    state.userPageSize = Number(data.pageSize);
+  } else {
+    state.userTotal = data.users.length;
+    state.userPage = page;
+    const from = (page - 1) * state.userPageSize;
+    state.users = data.users.slice(from, from + state.userPageSize);
+  }
   renderUsers();
+  renderPagination("usersPagination", "user", state.userTotal, state.userPage, state.userPageSize);
 }
 
 async function refreshUsers() {
-  await loadUsers();
+  await loadUsers(state.userPage);
   toast("账号列表已刷新");
 }
 
@@ -887,7 +977,7 @@ async function saveUser(event) {
   const method = form.mode.value === "edit" ? "PUT" : "POST";
   await api("/api/users", { method, body: new FormData(form) });
   resetUserForm();
-  await loadUsers();
+  await loadUsers(state.userPage);
   toast("账号已保存");
 }
 
@@ -899,7 +989,10 @@ async function deleteUser(username, loginId = username) {
   if (form.mode.value === "edit" && form.username.value === username) {
     resetUserForm();
   }
-  await loadUsers();
+  await loadUsers(state.userPage);
+  if (!state.users.length && state.userPage > 1) {
+    await loadUsers(state.userPage - 1);
+  }
   toast("账号已删除");
 }
 
@@ -1051,7 +1144,7 @@ function openModelConfigForm(profile = null) {
 function renderModelConfigList(data) {
   const list = $("#modelConfigList");
   const localActive = !!data.localAnalysis;
-  const localCard = modelConfigCardHtml({
+  const profiles = [{
     id: "local",
     name: "本地规则分析",
     apiUrl: "不调用外部大模型接口",
@@ -1060,9 +1153,21 @@ function renderModelConfigList(data) {
     configured: true,
     active: localActive,
     local: true,
-  });
-  const configCards = (data.configs || []).map(modelConfigCardHtml).join("");
-  list.innerHTML = localCard + configCards;
+  }, ...(data.configs || [])];
+  const totalPages = Math.max(1, Math.ceil(profiles.length / state.modelPageSize));
+  state.modelPage = Math.min(Math.max(1, state.modelPage), totalPages);
+  const from = (state.modelPage - 1) * state.modelPageSize;
+  list.innerHTML = profiles
+    .slice(from, from + state.modelPageSize)
+    .map(modelConfigCardHtml)
+    .join("");
+  renderPagination(
+    "modelConfigPagination",
+    "model",
+    profiles.length,
+    state.modelPage,
+    state.modelPageSize
+  );
 }
 
 function modelConfigCardHtml(profile) {
@@ -1169,6 +1274,12 @@ function repairColumnCount() {
   return 9;
 }
 
+function isPagedResponse(data) {
+  return Number.isFinite(Number(data.total))
+    && Number.isFinite(Number(data.page))
+    && Number.isFinite(Number(data.pageSize));
+}
+
 function renderPagination(targetId, type, totalItems, currentPage, pageSize) {
   const target = $(`#${targetId}`);
   if (!target) return;
@@ -1204,6 +1315,15 @@ async function changePage(type, page) {
     await loadRepairs(page);
   } else if (type === "room") {
     await loadRooms(page);
+  } else if (type === "occupancy") {
+    await loadOccupancyDetails(state.occupancyScope, state.occupancyValue, page);
+  } else if (type === "building") {
+    await loadBuildings(page);
+  } else if (type === "user") {
+    await loadUsers(page);
+  } else if (type === "model") {
+    state.modelPage = page;
+    renderModelConfigList(state.modelConfig);
   } else if (type === "audit") {
     await loadAuditLogs(page);
   } else {
@@ -1226,6 +1346,19 @@ async function changePageSize(type, pageSize) {
   } else if (type === "room" && pageSizeOptions.includes(size)) {
     state.roomPageSize = size;
     await loadRooms(1);
+  } else if (type === "occupancy" && pageSizeOptions.includes(size)) {
+    state.occupancyPageSize = size;
+    await loadOccupancyDetails(state.occupancyScope, state.occupancyValue, 1);
+  } else if (type === "building" && pageSizeOptions.includes(size)) {
+    state.buildingPageSize = size;
+    await loadBuildings(1);
+  } else if (type === "user" && pageSizeOptions.includes(size)) {
+    state.userPageSize = size;
+    await loadUsers(1);
+  } else if (type === "model" && pageSizeOptions.includes(size)) {
+    state.modelPageSize = size;
+    state.modelPage = 1;
+    renderModelConfigList(state.modelConfig);
   } else if (type === "audit" && auditPageSizeOptions.includes(size)) {
     state.auditPageSize = size;
     await loadAuditLogs(1);
@@ -1240,6 +1373,10 @@ function paginationLabel(type) {
   if (type === "request") return "申请记录";
   if (type === "repair") return "报修记录";
   if (type === "room") return "宿舍管理";
+  if (type === "occupancy") return "床位明细";
+  if (type === "building") return "楼栋管理";
+  if (type === "user") return "账号管理";
+  if (type === "model") return "模型配置";
   if (type === "audit") return "操作日志";
   return "列表";
 }

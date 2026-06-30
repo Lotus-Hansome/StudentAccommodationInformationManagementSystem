@@ -287,6 +287,7 @@
                 <div class="table-wrap">
                     <table><thead><tr><th>范围</th><th>房间数</th><th>入住人数</th><th>总床位</th><th>空余床位</th><th>入住率</th></tr></thead><tbody id="occupancyTable"></tbody></table>
                 </div>
+                <div id="occupancyPagination" class="pagination"></div>
             </section>
         </section>
 
@@ -305,6 +306,7 @@
                     <button class="btn primary" type="submit"><svg><use href="#icon-save"></use></svg>保存</button>
                 </form>
                 <div class="table-wrap"><table><thead><tr><th>楼栋号</th><th>名称</th><th>类型</th><th>楼层</th><th>状态</th><th>操作</th></tr></thead><tbody id="buildingsTable"></tbody></table></div>
+                <div id="buildingsPagination" class="pagination"></div>
             </section>
         </section>
 
@@ -335,6 +337,7 @@
                 <section class="panel main-panel">
                     <div class="panel-head"><h3>系统账号</h3><button id="reloadUsersButton" class="btn">刷新</button></div>
                     <div class="table-wrap"><table><thead><tr><th>登录账号</th><th>角色</th><th>绑定学号</th><th>状态</th><th>操作</th></tr></thead><tbody id="usersTable"></tbody></table></div>
+                    <div id="usersPagination" class="pagination"></div>
                 </section>
                 <aside class="panel editor-panel">
                     <div class="panel-head"><h3 id="userFormTitle">新增账号</h3></div>
@@ -381,6 +384,7 @@
                         </div>
                     </div>
                     <div id="modelConfigList" class="model-config-list"></div>
+                    <div id="modelConfigPagination" class="pagination"></div>
                     <form id="modelConfigForm" class="model-config-editor hidden">
                         <input type="hidden" name="id">
                         <div class="model-form-grid">
