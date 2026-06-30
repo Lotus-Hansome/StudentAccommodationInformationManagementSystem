@@ -498,9 +498,16 @@ public class DormitoryWebServer {
         User admin = requireAdmin(exchange);
         if ("GET".equalsIgnoreCase(method)) {
             Map<String, String> query = parseQuery(exchange.getRequestURI().getRawQuery());
-            sendJson(exchange, 200, "{\"success\":true,\"rooms\":" + roomsJson(infrastructureService.listRooms(
+            PageResult<DormRoom> result = paginate(infrastructureService.listRooms(
                     query.getOrDefault("buildingNumber", ""),
-                    query.getOrDefault("keyword", ""))) + "}");
+                    query.getOrDefault("keyword", "")),
+                    parseInt(query.get("page"), 1),
+                    parseInt(query.get("pageSize"), 10));
+            sendJson(exchange, 200, "{"
+                    + WebJson.booleanProperty("success", true) + ","
+                    + "\"rooms\":" + roomsJson(result.getItems()) + ","
+                    + pageJson(result)
+                    + "}");
             return;
         }
         if ("POST".equalsIgnoreCase(method) || "PUT".equalsIgnoreCase(method)) {

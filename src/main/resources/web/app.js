@@ -23,6 +23,10 @@ const state = {
   users: [],
   buildings: [],
   rooms: [],
+  roomTotal: 0,
+  roomPage: 1,
+  roomPageSize: 10,
+  roomParams: {},
   logs: [],
   auditTotal: 0,
   auditPage: 1,
@@ -150,6 +154,10 @@ async function logout(options = {}) {
     users: [],
     buildings: [],
     rooms: [],
+    roomTotal: 0,
+    roomPage: 1,
+    roomPageSize: 10,
+    roomParams: {},
     logs: [],
     repairs: [],
     homeData: null,
@@ -208,7 +216,7 @@ function navigate(view) {
     loadOccupancyDetails($("#occupancyScope").value, $("#occupancyQuery").value.trim());
   }
   if (view === "buildings") loadBuildings();
-  if (view === "rooms") loadRooms();
+  if (view === "rooms") loadRooms(1);
   if (view === "users") loadUsers();
   if (view === "audit") loadAuditLogs(1);
   if (view === "settings") loadModelConfig();
@@ -705,18 +713,37 @@ async function saveBuilding(event) {
   await loadBuildings();
 }
 
-async function loadRooms() {
+async function loadRooms(page = 1, params = null) {
+  if (params) state.roomParams = { ...params };
   const query = new URLSearchParams({
-    buildingNumber: $("#roomBuildingQuery").value.trim(),
-    keyword: $("#roomKeyword").value.trim(),
+    ...state.roomParams,
+    page,
+    pageSize: state.roomPageSize,
   });
   const data = await api(`/api/rooms?${query.toString()}`);
-  state.rooms = data.rooms;
+  const serverPaged = Number.isFinite(Number(data.total))
+    && Number.isFinite(Number(data.page))
+    && Number.isFinite(Number(data.pageSize));
+  if (serverPaged) {
+    state.rooms = data.rooms;
+    state.roomTotal = Number(data.total);
+    state.roomPage = Number(data.page);
+    state.roomPageSize = Number(data.pageSize);
+  } else {
+    state.roomTotal = data.rooms.length;
+    state.roomPage = page;
+    const from = (page - 1) * state.roomPageSize;
+    state.rooms = data.rooms.slice(from, from + state.roomPageSize);
+  }
   renderRooms();
+  renderPagination("roomsPagination", "room", state.roomTotal, state.roomPage, state.roomPageSize);
 }
 
 async function searchRooms() {
-  await loadRooms();
+  await loadRooms(1, {
+    buildingNumber: $("#roomBuildingQuery").value.trim(),
+    keyword: $("#roomKeyword").value.trim(),
+  });
   toast("宿舍查询完成");
 }
 
@@ -778,7 +805,7 @@ async function saveRoom(event) {
   form.dataset.editing = "";
   form.roomType.value = "标准四人间";
   form.capacity.value = 4;
-  await loadRooms();
+  await loadRooms(state.roomPage);
 }
 
 async function loadUsers() {
@@ -1175,6 +1202,8 @@ async function changePage(type, page) {
     await loadRequests(state.requestMode, state.requestParams, page);
   } else if (type === "repair") {
     await loadRepairs(page);
+  } else if (type === "room") {
+    await loadRooms(page);
   } else if (type === "audit") {
     await loadAuditLogs(page);
   } else {
@@ -1194,6 +1223,9 @@ async function changePageSize(type, pageSize) {
   } else if (type === "repair" && pageSizeOptions.includes(size)) {
     state.repairPageSize = size;
     await loadRepairs(1);
+  } else if (type === "room" && pageSizeOptions.includes(size)) {
+    state.roomPageSize = size;
+    await loadRooms(1);
   } else if (type === "audit" && auditPageSizeOptions.includes(size)) {
     state.auditPageSize = size;
     await loadAuditLogs(1);
@@ -1207,6 +1239,7 @@ function paginationLabel(type) {
   if (type === "student") return "住宿信息";
   if (type === "request") return "申请记录";
   if (type === "repair") return "报修记录";
+  if (type === "room") return "宿舍管理";
   if (type === "audit") return "操作日志";
   return "列表";
 }
