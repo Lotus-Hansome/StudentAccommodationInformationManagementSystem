@@ -25,17 +25,16 @@ public class ChangeRequestService {
         }
     }
 
-    public DormChangeRequest submit(String studentId, String targetDormNumber, String targetDormPhone, String targetBedNumber, String reason) {
+    public synchronized DormChangeRequest submit(String studentId, String targetDormNumber, String targetDormPhone, String targetBedNumber, String reason) {
         String normalizedStudentId = normalizeText(studentId);
         String normalizedTargetDormNumber = normalizeText(targetDormNumber);
         String normalizedTargetDormPhone = normalizeText(targetDormPhone);
         String normalizedTargetBedNumber = normalizeText(targetBedNumber);
         String normalizedReason = normalizeText(reason);
         if (normalizedTargetDormNumber.isBlank()
-                || normalizedTargetDormPhone.isBlank()
                 || normalizedTargetBedNumber.isBlank()
                 || normalizedReason.isBlank()) {
-            throw new IllegalArgumentException("目标宿舍、目标电话、目标床位和调换理由不能为空。");
+            throw new IllegalArgumentException("目标宿舍、目标床位和调换理由不能为空。");
         }
 
         StudentDormRecord student = studentDormService.findByStudentId(normalizedStudentId)
@@ -69,7 +68,7 @@ public class ChangeRequestService {
                 student.getDormNumber(),
                 student.getBedNumber(),
                 normalizedTargetDormNumber,
-                normalizedTargetDormPhone,
+                studentDormService.dormPhoneFor(normalizedTargetDormNumber, normalizedTargetDormPhone),
                 normalizedTargetBedNumber,
                 normalizedReason,
                 ChangeRequestStatus.PENDING,
@@ -81,20 +80,20 @@ public class ChangeRequestService {
         return request;
     }
 
-    public List<DormChangeRequest> listAll() {
+    public synchronized List<DormChangeRequest> listAll() {
         return requests.stream()
                 .sorted(Comparator.comparing(DormChangeRequest::getCreatedAt).reversed())
                 .collect(Collectors.toList());
     }
 
-    public List<DormChangeRequest> listPending() {
+    public synchronized List<DormChangeRequest> listPending() {
         return requests.stream()
                 .filter(request -> request.getStatus() == ChangeRequestStatus.PENDING)
                 .sorted(Comparator.comparing(DormChangeRequest::getCreatedAt))
                 .collect(Collectors.toList());
     }
 
-    public List<DormChangeRequest> listByStudentId(String studentId) {
+    public synchronized List<DormChangeRequest> listByStudentId(String studentId) {
         String normalizedStudentId = normalizeText(studentId);
         return requests.stream()
                 .filter(request -> request.getStudentId().equalsIgnoreCase(normalizedStudentId))
@@ -102,7 +101,7 @@ public class ChangeRequestService {
                 .collect(Collectors.toList());
     }
 
-    public void approve(String requestId, String adminComment) {
+    public synchronized void approve(String requestId, String adminComment) {
         String normalizedComment = normalizeText(adminComment);
         if (normalizedComment.isBlank()) {
             throw new IllegalArgumentException("审批意见不能为空。");
@@ -126,7 +125,7 @@ public class ChangeRequestService {
         save();
     }
 
-    public void reject(String requestId, String adminComment) {
+    public synchronized void reject(String requestId, String adminComment) {
         String normalizedComment = normalizeText(adminComment);
         if (normalizedComment.isBlank()) {
             throw new IllegalArgumentException("审批意见不能为空。");
@@ -139,7 +138,7 @@ public class ChangeRequestService {
         save();
     }
 
-    public void cancel(String requestId, String studentId) {
+    public synchronized void cancel(String requestId, String studentId) {
         String normalizedRequestId = normalizeText(requestId);
         String normalizedStudentId = normalizeText(studentId);
         DormChangeRequest request = requests.stream()
@@ -152,6 +151,41 @@ public class ChangeRequestService {
         request.setHandledAt(LocalDateTime.now());
         request.setAdminComment("学生主动撤回。");
         save();
+    }
+
+    public synchronized void validateRoomChange(DormRoom room) {
+        for (DormChangeRequest request : requests) {
+            if (request.getStatus() != ChangeRequestStatus.PENDING
+                    || !request.getTargetDormNumber().equalsIgnoreCase(room.getDormNumber())) {
+                continue;
+            }
+            if (!room.isActive()) {
+                throw new IllegalArgumentException("该宿舍存在待审批的调换申请，不能停用。");
+            }
+            int targetBed;
+            try {
+                targetBed = Integer.parseInt(request.getTargetBedNumber());
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("该宿舍存在非数字目标床位的待审批申请，不能直接修改容量。");
+            }
+            if (targetBed < 1 || targetBed > room.getCapacity()) {
+                throw new IllegalArgumentException(
+                        "申请 " + request.getId() + " 正在锁定 " + request.getTargetBedNumber()
+                                + " 号床，宿舍容量不能缩减为 " + room.getCapacity() + "。");
+            }
+        }
+    }
+
+    public synchronized void validateBedAssignment(String dormNumber, String bedNumber) {
+        String normalizedDormNumber = normalizeText(dormNumber);
+        String normalizedBedNumber = normalizeText(bedNumber);
+        boolean locked = requests.stream()
+                .anyMatch(request -> request.getStatus() == ChangeRequestStatus.PENDING
+                        && request.getTargetDormNumber().equalsIgnoreCase(normalizedDormNumber)
+                        && request.getTargetBedNumber().equalsIgnoreCase(normalizedBedNumber));
+        if (locked) {
+            throw new IllegalArgumentException("该床位已被待审批调换申请锁定，请先处理申请。");
+        }
     }
 
     private Optional<DormChangeRequest> findPending(String requestId) {

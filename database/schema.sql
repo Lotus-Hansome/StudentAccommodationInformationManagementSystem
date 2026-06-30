@@ -99,3 +99,18 @@ CREATE TABLE IF NOT EXISTS operation_logs (
   KEY idx_log_created (created_at),
   KEY idx_log_operator (operator)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS repair_reports (
+  id VARCHAR(64) PRIMARY KEY,
+  student_id VARCHAR(32) NOT NULL,
+  dorm_number VARCHAR(32) NOT NULL,
+  category VARCHAR(64) NOT NULL,
+  description VARCHAR(1000) NOT NULL,
+  status VARCHAR(32) NOT NULL,
+  created_at DATETIME NOT NULL,
+  handled_at DATETIME NULL,
+  admin_comment VARCHAR(500) NULL,
+  KEY idx_repair_student (student_id),
+  KEY idx_repair_status (status),
+  KEY idx_repair_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

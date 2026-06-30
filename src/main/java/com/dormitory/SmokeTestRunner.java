@@ -1,5 +1,11 @@
 package com.dormitory;
 
+import com.sun.net.httpserver.HttpServer;
+
+import java.io.IOException;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -11,7 +17,10 @@ public final class SmokeTestRunner {
 
     public static void run() {
         Path dataDirectory = Path.of("build", "smoke-data-" + System.currentTimeMillis());
-        StudentDormService studentService = new StudentDormService(new CsvStudentRepository(dataDirectory, false));
+        DormInfrastructureService infrastructureService =
+                new DormInfrastructureService(new InMemoryDormInfrastructureRepository());
+        StudentDormService studentService =
+                new StudentDormService(new CsvStudentRepository(dataDirectory, false), infrastructureService);
         ChangeRequestService requestService = new ChangeRequestService(new CsvChangeRequestRepository(dataDirectory), studentService);
 
         studentService.add(new StudentDormRecord("T001", "Test A", "Computer", "Software Test 1", "9-101", "0571-9101", "1"));
@@ -26,24 +35,47 @@ public final class SmokeTestRunner {
         require(studentService.sortByDepartmentAndClass().size() == 3, "sort failed");
         require(!studentService.deleteByDormAndStudent("0-000", "NO_SUCH"), "missing delete should return false");
         require(studentService.buildingOccupancySummaries().size() == 1, "building occupancy summary failed");
-        require(studentService.dormOccupancySummaries().size() == 2, "dorm occupancy summary failed");
+        require(studentService.dormOccupancySummaries().size() == 3, "dorm occupancy summary should include empty rooms");
         require(studentService.buildingOccupancySummaries("9").size() == 1, "filtered building occupancy summary failed");
         require(studentService.dormOccupancySummaries("9-101").size() == 1, "filtered dorm occupancy summary failed");
         DormOccupancySummary buildingSummary = studentService.buildingOccupancySummaries().get(0);
-        require(buildingSummary.getRoomCount() == 2 && buildingSummary.getTotalCapacity() == 8 && buildingSummary.getVacantBeds() == 5,
+        require(buildingSummary.getRoomCount() == 3 && buildingSummary.getTotalCapacity() == 12 && buildingSummary.getVacantBeds() == 9,
                 "building vacant bed calculation failed");
+        DormStatistics initialStatistics = studentService.statisticsByBuilding("9");
+        require(initialStatistics.getRoomCount() == 3,
+                "building statistics should include empty rooms");
+        DormStatistics missingDormStatistics = studentService.statisticsByDorm("9-999");
+        require(missingDormStatistics.getRoomCount() == 0 && missingDormStatistics.getTotalCapacity() == 0,
+                "missing dorm statistics should not invent capacity");
+        expectFailure(
+                () -> studentService.validateRoomChange(
+                        new DormRoom("9-101", "9", 1, "Test room", "MIXED", 1, "0571-9101", "ACTIVE")),
+                "room capacity must not exclude an occupied bed");
+        expectFailure(
+                () -> infrastructureService.saveRoom(
+                        new DormRoom("8-101", "9", 1, "Test room", "MIXED", 4, "0571-8101", "ACTIVE")),
+                "room number must match its building");
+        expectFailure(
+                () -> infrastructureService.saveRoom(
+                        new DormRoom("9-104", "9", 1, "Test room", "MIXED", 4, "0571-9104", "UNKNOWN")),
+                "room status should only accept supported values");
 
         expectFailure(
                 () -> requestService.submit("T003", "9-103", "0571-9103", "1", " "),
                 "blank reason should be rejected");
 
-        DormChangeRequest request = requestService.submit("T003", "9-101", "0571-9101", "3", "Closer to the lab");
+        DormChangeRequest request = requestService.submit("T003", "9-101", "", "3", "Closer to the lab");
+        require("0571-9101".equals(request.getTargetDormPhone()),
+                "change request should use the room phone from infrastructure");
         expectFailure(
                 () -> requestService.submit("T003", "9-103", "0571-9103", "1", "Second pending request"),
                 "duplicate pending request should be rejected");
         expectFailure(
                 () -> requestService.submit("T002", "9-101", "0571-9101", "3", "Same target bed"),
                 "pending target bed should be locked");
+        expectFailure(
+                () -> requestService.validateBedAssignment("9-101", "3"),
+                "administrator assignment should respect a pending target-bed lock");
         expectFailure(
                 () -> requestService.approve(request.getId(), " "),
                 "blank approval comment should be rejected");
@@ -69,7 +101,7 @@ public final class SmokeTestRunner {
                 "student should be able to cancel an active repair report");
 
         InMemoryUserRepository userRepository = new InMemoryUserRepository();
-        UserService userService = new UserService(userRepository);
+        UserService userService = new UserService(userRepository, studentService);
         userService.create("admin2", "admin234", "ADMIN", "", true);
         long enabledAdmins = userService.listAll().stream()
                 .filter(user -> user.getRole() == UserRole.ADMIN && user.isEnabled())
@@ -78,6 +110,9 @@ public final class SmokeTestRunner {
         expectFailure(
                 () -> userService.create("invalid-admin", "admin234", "ADMIN", "T001", true),
                 "administrator should not be bound to a student");
+        expectFailure(
+                () -> userService.create("", "student234", "USER", "NO_SUCH_STUDENT", true),
+                "student account should only bind to an existing student record");
         expectFailure(
                 () -> userService.update("admin2", "ADMIN", "T002", true, "admin"),
                 "administrator update should reject a student binding");
@@ -110,6 +145,7 @@ public final class SmokeTestRunner {
         DormStatistics statistics = studentService.statisticsByBuilding("9");
         String analysis = new LocalRuleDormAnalyzer().analyze(statistics);
         require(analysis.contains("入住率"), "analysis should include occupancy rate");
+        verifyOpenAiCompatibleAnalysis(statistics);
 
         System.out.println("SMOKE_TEST_PASSED");
         System.out.println(statistics.toPromptText());
@@ -119,6 +155,40 @@ public final class SmokeTestRunner {
     private static void require(boolean condition, String message) {
         if (!condition) {
             throw new IllegalStateException(message);
+        }
+    }
+
+    private static void verifyOpenAiCompatibleAnalysis(DormStatistics statistics) {
+        HttpServer server;
+        try {
+            server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        } catch (IOException e) {
+            throw new IllegalStateException("could not start local model mock", e);
+        }
+        server.createContext("/v1/chat/completions", exchange -> {
+            byte[] requestBody = exchange.getRequestBody().readAllBytes();
+            String requestText = new String(requestBody, StandardCharsets.UTF_8);
+            require(requestText.contains("\"model\":\"mock-model\""), "model request should include configured model");
+            require(requestText.contains("总床位"), "model request should include dorm statistics");
+            byte[] response = "{\"choices\":[{\"message\":{\"content\":\"模型分析链路正常\"}}]}"
+                    .getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
+            exchange.sendResponseHeaders(200, response.length);
+            try (OutputStream outputStream = exchange.getResponseBody()) {
+                outputStream.write(response);
+            }
+        });
+        server.start();
+        try {
+            ModelServiceConfig config = new ModelServiceConfig(
+                    "http://127.0.0.1:" + server.getAddress().getPort() + "/v1/chat/completions",
+                    "mock-api-key",
+                    "mock-model",
+                    "smoke-test");
+            String result = new OpenAiCompatibleDormAnalyzer(config).analyze(statistics);
+            require("模型分析链路正常".equals(result), "model response parsing failed");
+        } finally {
+            server.stop(0);
         }
     }
 
@@ -192,6 +262,54 @@ public final class SmokeTestRunner {
         @Override
         public void save(List<RepairReport> reports) {
             this.reports = new ArrayList<>(reports);
+        }
+    }
+
+    private static class InMemoryDormInfrastructureRepository implements DormInfrastructureRepository {
+        private final List<Building> buildings = new ArrayList<>();
+        private final List<DormRoom> rooms = new ArrayList<>();
+        private final List<DormBed> beds = new ArrayList<>();
+
+        private InMemoryDormInfrastructureRepository() {
+            buildings.add(new Building("9", "Test Building", "MIXED", 6, "ACTIVE"));
+            upsertRoomUnchecked(new DormRoom("9-101", "9", 1, "Test room", "MIXED", 4, "0571-9101", "ACTIVE"));
+            upsertRoomUnchecked(new DormRoom("9-102", "9", 1, "Test room", "MIXED", 4, "0571-9102", "ACTIVE"));
+            upsertRoomUnchecked(new DormRoom("9-103", "9", 1, "Test room", "MIXED", 4, "0571-9103", "ACTIVE"));
+        }
+
+        @Override
+        public List<Building> loadBuildings() {
+            return new ArrayList<>(buildings);
+        }
+
+        @Override
+        public List<DormRoom> loadRooms() {
+            return new ArrayList<>(rooms);
+        }
+
+        @Override
+        public List<DormBed> loadBeds() {
+            return new ArrayList<>(beds);
+        }
+
+        @Override
+        public void upsertBuilding(Building building) {
+            buildings.removeIf(item -> item.getBuildingNumber().equalsIgnoreCase(building.getBuildingNumber()));
+            buildings.add(building);
+        }
+
+        @Override
+        public void upsertRoom(DormRoom room) {
+            upsertRoomUnchecked(room);
+        }
+
+        private void upsertRoomUnchecked(DormRoom room) {
+            rooms.removeIf(item -> item.getDormNumber().equalsIgnoreCase(room.getDormNumber()));
+            rooms.add(room);
+            beds.removeIf(item -> item.getDormNumber().equalsIgnoreCase(room.getDormNumber()));
+            for (int i = 1; i <= room.getCapacity(); i++) {
+                beds.add(new DormBed(room.getDormNumber(), String.valueOf(i), "ACTIVE"));
+            }
         }
     }
 

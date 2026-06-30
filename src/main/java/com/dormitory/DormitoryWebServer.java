@@ -46,10 +46,10 @@ public class DormitoryWebServer {
     public DormitoryWebServer(int port, Path webRoot) {
         MysqlConnectionFactory connectionFactory = MysqlSupport.initializedConnectionFactory();
         MysqlUserRepository userRepository = new MysqlUserRepository(connectionFactory);
-        this.authService = new AuthService(userRepository);
-        this.userService = new UserService(userRepository);
         this.infrastructureService = new DormInfrastructureService(new MysqlDormInfrastructureRepository(connectionFactory));
         this.studentDormService = new StudentDormService(new MysqlStudentRepository(connectionFactory), infrastructureService);
+        this.authService = new AuthService(userRepository);
+        this.userService = new UserService(userRepository, studentDormService);
         this.changeRequestService = new ChangeRequestService(new MysqlChangeRequestRepository(connectionFactory), studentDormService);
         this.repairReportService = new RepairReportService(new MysqlRepairReportRepository(connectionFactory));
         this.dormAnalysisService = new DormAnalysisService();
@@ -279,6 +279,7 @@ public class DormitoryWebServer {
             User admin = requireAdmin(exchange);
             Map<String, String> form = readForm(exchange);
             StudentDormRecord record = studentFromForm(form);
+            changeRequestService.validateBedAssignment(record.getDormNumber(), record.getBedNumber());
             studentDormService.add(record);
             operationLogService.record(admin.getUsername(), "ADD_STUDENT", "student", record.getStudentId(), "新增学生住宿信息");
             sendJson(exchange, 200, "{\"success\":true,\"message\":\"添加成功。\"}");
@@ -288,6 +289,13 @@ public class DormitoryWebServer {
             User admin = requireAdmin(exchange);
             Map<String, String> form = readForm(exchange);
             StudentDormRecord record = studentFromForm(form);
+            boolean changesBed = studentDormService.findByStudentId(record.getStudentId())
+                    .map(existing -> !existing.getDormNumber().equalsIgnoreCase(record.getDormNumber().trim())
+                            || !existing.getBedNumber().equalsIgnoreCase(record.getBedNumber().trim()))
+                    .orElse(true);
+            if (changesBed) {
+                changeRequestService.validateBedAssignment(record.getDormNumber(), record.getBedNumber());
+            }
             studentDormService.update(record);
             operationLogService.record(admin.getUsername(), "UPDATE_STUDENT", "student", record.getStudentId(), "修改学生住宿信息");
             sendJson(exchange, 200, "{\"success\":true,\"message\":\"修改成功。\"}");
@@ -302,8 +310,9 @@ public class DormitoryWebServer {
             if (!removed) {
                 throw new ApiException(404, "未找到匹配的住宿记录。");
             }
+            userService.disableStudentAccount(studentId).ifPresent(this::invalidateSessions);
             operationLogService.record(admin.getUsername(), "DELETE_STUDENT", "student", studentId, "删除宿舍 " + dormNumber + " 的住宿信息");
-            sendJson(exchange, 200, "{\"success\":true,\"removed\":" + removed + "}");
+            sendJson(exchange, 200, "{\"success\":true,\"removed\":true,\"message\":\"住宿记录已删除；关联学生账号如存在，已同步停用。\"}");
             return;
         }
         throw new ApiException(405, "请求方法不支持。");
@@ -493,7 +502,10 @@ public class DormitoryWebServer {
         }
         if ("POST".equalsIgnoreCase(method) || "PUT".equalsIgnoreCase(method)) {
             DormRoom room = roomFromForm(readForm(exchange));
+            studentDormService.validateRoomChange(room);
+            changeRequestService.validateRoomChange(room);
             infrastructureService.saveRoom(room);
+            studentDormService.synchronizeRoomPhone(room);
             operationLogService.record(admin.getUsername(), "SAVE_ROOM", "dorm_room", room.getDormNumber(), "保存宿舍基础信息");
             sendJson(exchange, 200, "{\"success\":true,\"message\":\"宿舍已保存。\"}");
             return;
@@ -509,13 +521,17 @@ public class DormitoryWebServer {
         }
         if ("POST".equalsIgnoreCase(method)) {
             Map<String, String> form = readForm(exchange);
+            String role = form.getOrDefault("role", "USER");
+            String targetId = "ADMIN".equalsIgnoreCase(role)
+                    ? form.getOrDefault("username", "")
+                    : form.getOrDefault("studentId", "");
             userService.create(
                     form.getOrDefault("username", ""),
                     form.getOrDefault("password", ""),
-                    form.getOrDefault("role", "USER"),
+                    role,
                     form.getOrDefault("studentId", ""),
                     parseBoolean(form.getOrDefault("enabled", "true")));
-            operationLogService.record(admin.getUsername(), "ADD_USER", "user", form.getOrDefault("username", ""), "新增系统账号");
+            operationLogService.record(admin.getUsername(), "ADD_USER", "user", targetId, "新增系统账号");
             sendJson(exchange, 200, "{\"success\":true,\"message\":\"用户已创建。\"}");
             return;
         }
@@ -527,6 +543,7 @@ public class DormitoryWebServer {
                     form.getOrDefault("studentId", ""),
                     parseBoolean(form.getOrDefault("enabled", "true")),
                     admin.getUsername());
+            invalidateSessions(form.getOrDefault("username", ""), admin.getUsername());
             operationLogService.record(admin.getUsername(), "UPDATE_USER", "user", form.getOrDefault("username", ""), "更新系统账号");
             sendJson(exchange, 200, "{\"success\":true,\"message\":\"用户已更新。\"}");
             return;
@@ -548,6 +565,7 @@ public class DormitoryWebServer {
         User user = requireUser(exchange);
         Map<String, String> form = readForm(exchange);
         userService.changePassword(user.getUsername(), form.getOrDefault("oldPassword", ""), form.getOrDefault("newPassword", ""));
+        invalidateSessions(user.getUsername());
         operationLogService.record(user.getUsername(), "CHANGE_PASSWORD", "user", user.getUsername(), "修改本人密码");
         sendJson(exchange, 200, "{\"success\":true,\"message\":\"密码已修改，请重新登录。\"}");
     }
@@ -556,7 +574,11 @@ public class DormitoryWebServer {
         User admin = requireAdmin(exchange);
         Map<String, String> form = readForm(exchange);
         String username = form.getOrDefault("username", "");
+        if (username.equalsIgnoreCase(admin.getUsername())) {
+            throw new IllegalArgumentException("请通过“修改密码”功能修改当前管理员密码。");
+        }
         userService.resetPassword(username, form.getOrDefault("newPassword", ""));
+        invalidateSessions(username);
         operationLogService.record(admin.getUsername(), "RESET_PASSWORD", "user", username, "重置用户密码");
         sendJson(exchange, 200, "{\"success\":true,\"message\":\"密码已重置。\"}");
     }
@@ -936,8 +958,36 @@ public class DormitoryWebServer {
             sessions.remove(token);
             throw new ApiException(401, "登录已过期，请重新登录。");
         }
+        User currentUser = userService.findByUsername(session.user.getUsername())
+                .orElseThrow(() -> {
+                    sessions.remove(token);
+                    return new ApiException(401, "账号已删除，请重新登录。");
+                });
+        if (!currentUser.isEnabled()) {
+            sessions.remove(token);
+            throw new ApiException(401, "账号已停用，请联系管理员。");
+        }
         session.expiresAt = LocalDateTime.now().plusMinutes(SESSION_TTL_MINUTES);
-        return session.user;
+        return currentUser;
+    }
+
+    private void invalidateSessions(String username, String... excludedUsernames) {
+        String normalized = username == null ? "" : username.trim();
+        if (normalized.isBlank()) {
+            return;
+        }
+        sessions.entrySet().removeIf(entry -> {
+            String sessionUsername = entry.getValue().user.getUsername();
+            if (!sessionUsername.equalsIgnoreCase(normalized)) {
+                return false;
+            }
+            for (String excluded : excludedUsernames) {
+                if (sessionUsername.equalsIgnoreCase(excluded == null ? "" : excluded.trim())) {
+                    return false;
+                }
+            }
+            return true;
+        });
     }
 
     private User requireAdmin(HttpExchange exchange) {

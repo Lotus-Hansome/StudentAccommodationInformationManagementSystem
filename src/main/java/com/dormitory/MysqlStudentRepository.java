@@ -79,6 +79,52 @@ public class MysqlStudentRepository implements StudentRepository {
         }
     }
 
+    @Override
+    public void insert(StudentDormRecord record) throws IOException {
+        String sql = """
+                INSERT INTO students (student_id, name, department, class_name, dorm_number, dorm_phone, bed_number)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """;
+        executeWrite(sql, record, "新增 MySQL 学生住宿数据失败：");
+    }
+
+    @Override
+    public void update(StudentDormRecord record) throws IOException {
+        String sql = """
+                UPDATE students
+                SET name = ?, department = ?, class_name = ?, dorm_number = ?, dorm_phone = ?, bed_number = ?
+                WHERE student_id = ?
+                """;
+        try (Connection connection = connectionFactory.openConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, record.getName());
+            statement.setString(2, record.getDepartment());
+            statement.setString(3, record.getClassName());
+            statement.setString(4, record.getDormNumber());
+            statement.setString(5, record.getDormPhone());
+            statement.setString(6, record.getBedNumber());
+            statement.setString(7, record.getStudentId());
+            if (statement.executeUpdate() == 0) {
+                throw new IOException("未找到要修改的学生住宿记录。");
+            }
+        } catch (SQLException e) {
+            throw new IOException("修改 MySQL 学生住宿数据失败：" + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public boolean deleteByDormAndStudent(String dormNumber, String studentId) throws IOException {
+        String sql = "DELETE FROM students WHERE dorm_number = ? AND student_id = ?";
+        try (Connection connection = connectionFactory.openConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, dormNumber);
+            statement.setString(2, studentId);
+            return statement.executeUpdate() > 0;
+        } catch (SQLException e) {
+            throw new IOException("删除 MySQL 学生住宿数据失败：" + e.getMessage(), e);
+        }
+    }
+
     public PageResult<StudentDormRecord> search(StudentSearchCriteria criteria) throws IOException {
         List<Object> params = new ArrayList<>();
         String where = buildWhere(criteria, params);
@@ -173,6 +219,22 @@ public class MysqlStudentRepository implements StudentRepository {
     private void fill(PreparedStatement statement, List<Object> params) throws SQLException {
         for (int i = 0; i < params.size(); i++) {
             statement.setObject(i + 1, params.get(i));
+        }
+    }
+
+    private void executeWrite(String sql, StudentDormRecord record, String errorPrefix) throws IOException {
+        try (Connection connection = connectionFactory.openConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, record.getStudentId());
+            statement.setString(2, record.getName());
+            statement.setString(3, record.getDepartment());
+            statement.setString(4, record.getClassName());
+            statement.setString(5, record.getDormNumber());
+            statement.setString(6, record.getDormPhone());
+            statement.setString(7, record.getBedNumber());
+            statement.executeUpdate();
+        } catch (SQLException e) {
+            throw new IOException(errorPrefix + e.getMessage(), e);
         }
     }
 

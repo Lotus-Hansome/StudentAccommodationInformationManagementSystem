@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="data:,">
     <title>学生宿舍信息管理系统</title>
     <link rel="stylesheet" href="/styles.css">
 </head>
@@ -189,7 +190,6 @@
                 <form id="requestForm" class="form-grid">
                     <label><span>学号</span><input name="studentId" required></label>
                     <label><span>目标宿舍</span><input name="targetDormNumber" required></label>
-                    <label><span>目标电话</span><input name="targetDormPhone" required></label>
                     <label><span>目标床位</span><input name="targetBedNumber" required></label>
                     <label class="wide"><span>调换理由</span><textarea name="reason" rows="5" required></textarea></label>
                     <div class="form-actions"><button class="btn primary" type="submit"><svg><use href="#icon-plus"></use></svg>提交</button></div>
@@ -410,7 +410,7 @@
     </form>
 </div>
 
-<div id="toast" class="toast hidden"></div>
+<div id="toast" class="toast hidden" role="status" aria-live="polite" aria-atomic="true"></div>
 <script src="/app.js"></script>
 </body>
 </html>

@@ -28,7 +28,7 @@ public class DormInfrastructureService {
         }
     }
 
-    public List<Building> listBuildings(String keyword) {
+    public synchronized List<Building> listBuildings(String keyword) {
         String query = normalizeText(keyword).toLowerCase(Locale.ROOT);
         return buildings.stream()
                 .filter(building -> query.isBlank()
@@ -38,7 +38,7 @@ public class DormInfrastructureService {
                 .collect(Collectors.toList());
     }
 
-    public List<DormRoom> listRooms(String buildingNumber, String keyword) {
+    public synchronized List<DormRoom> listRooms(String buildingNumber, String keyword) {
         String building = normalizeBuildingNumber(buildingNumber);
         String query = normalizeText(keyword).toLowerCase(Locale.ROOT);
         return rooms.stream()
@@ -50,29 +50,29 @@ public class DormInfrastructureService {
                 .collect(Collectors.toList());
     }
 
-    public Optional<Building> findBuilding(String buildingNumber) {
+    public synchronized Optional<Building> findBuilding(String buildingNumber) {
         String normalized = normalizeBuildingNumber(buildingNumber);
         return buildings.stream()
                 .filter(building -> building.getBuildingNumber().equalsIgnoreCase(normalized))
                 .findFirst();
     }
 
-    public Optional<DormRoom> findRoom(String dormNumber) {
+    public synchronized Optional<DormRoom> findRoom(String dormNumber) {
         String normalized = normalizeText(dormNumber);
         return rooms.stream()
                 .filter(room -> room.getDormNumber().equalsIgnoreCase(normalized))
                 .findFirst();
     }
 
-    public boolean hasInfrastructureData() {
+    public synchronized boolean hasInfrastructureData() {
         return !buildings.isEmpty() || !rooms.isEmpty();
     }
 
-    public boolean isRoomActive(String dormNumber) {
+    public synchronized boolean isRoomActive(String dormNumber) {
         return findRoom(dormNumber).map(DormRoom::isActive).orElse(false);
     }
 
-    public boolean isBedActive(String dormNumber, String bedNumber) {
+    public synchronized boolean isBedActive(String dormNumber, String bedNumber) {
         String normalizedDorm = normalizeText(dormNumber);
         String normalizedBed = normalizeText(bedNumber);
         return beds.stream()
@@ -81,15 +81,15 @@ public class DormInfrastructureService {
                         && bed.isActive());
     }
 
-    public int roomCapacity(String dormNumber) {
+    public synchronized int roomCapacity(String dormNumber) {
         return findRoom(dormNumber).map(DormRoom::getCapacity).orElse(StudentDormService.DEFAULT_BEDS_PER_DORM);
     }
 
-    public String roomPhone(String dormNumber) {
+    public synchronized String roomPhone(String dormNumber) {
         return findRoom(dormNumber).map(DormRoom::getPhone).orElse("");
     }
 
-    public int buildingCapacity(String buildingNumber) {
+    public synchronized int buildingCapacity(String buildingNumber) {
         String normalized = normalizeBuildingNumber(buildingNumber);
         return rooms.stream()
                 .filter(DormRoom::isActive)
@@ -98,27 +98,27 @@ public class DormInfrastructureService {
                 .sum();
     }
 
-    public int totalCapacity() {
+    public synchronized int totalCapacity() {
         return rooms.stream()
                 .filter(DormRoom::isActive)
                 .mapToInt(DormRoom::getCapacity)
                 .sum();
     }
 
-    public Set<String> activeDormNumbers() {
+    public synchronized Set<String> activeDormNumbers() {
         return rooms.stream()
                 .filter(DormRoom::isActive)
                 .map(DormRoom::getDormNumber)
                 .collect(Collectors.toCollection(TreeSet::new));
     }
 
-    public Map<String, List<DormRoom>> activeRoomsByBuilding() {
+    public synchronized Map<String, List<DormRoom>> activeRoomsByBuilding() {
         return rooms.stream()
                 .filter(DormRoom::isActive)
                 .collect(Collectors.groupingBy(DormRoom::getBuildingNumber));
     }
 
-    public void saveBuilding(Building building) {
+    public synchronized void saveBuilding(Building building) {
         validateBuilding(building);
         try {
             repository.upsertBuilding(building);
@@ -128,7 +128,7 @@ public class DormInfrastructureService {
         }
     }
 
-    public void saveRoom(DormRoom room) {
+    public synchronized void saveRoom(DormRoom room) {
         validateRoom(room);
         try {
             repository.upsertRoom(room);
@@ -143,8 +143,28 @@ public class DormInfrastructureService {
         if (building.getBuildingNumber().isBlank() || building.getBuildingName().isBlank()) {
             throw new IllegalArgumentException("楼栋号和楼栋名称不能为空。");
         }
-        if (building.getTotalFloors() <= 0) {
-            throw new IllegalArgumentException("楼层数必须大于 0。");
+        validateGenderType(building.getGenderType());
+        validateStatus(building.getStatus());
+        if (building.getTotalFloors() <= 0 || building.getTotalFloors() > 100) {
+            throw new IllegalArgumentException("楼层数必须在 1 到 100 之间。");
+        }
+        boolean hasRoomAboveLimit = rooms.stream()
+                .anyMatch(room -> room.getBuildingNumber().equalsIgnoreCase(building.getBuildingNumber())
+                        && room.getFloorNumber() > building.getTotalFloors());
+        if (hasRoomAboveLimit) {
+            throw new IllegalArgumentException("楼栋中存在高于新楼层数的宿舍，不能保存。");
+        }
+        boolean hasActiveRooms = rooms.stream()
+                .anyMatch(room -> room.getBuildingNumber().equalsIgnoreCase(building.getBuildingNumber())
+                        && room.isActive());
+        if (!building.isActive() && hasActiveRooms) {
+            throw new IllegalArgumentException("楼栋中仍有启用宿舍，请先停用相关宿舍。");
+        }
+        boolean hasGenderConflict = rooms.stream()
+                .filter(room -> room.getBuildingNumber().equalsIgnoreCase(building.getBuildingNumber()))
+                .anyMatch(room -> !isGenderCompatible(building.getGenderType(), room.getGenderType()));
+        if (hasGenderConflict) {
+            throw new IllegalArgumentException("楼栋内已有宿舍类型与新的楼栋类型不一致。");
         }
     }
 
@@ -152,8 +172,24 @@ public class DormInfrastructureService {
         if (room.getDormNumber().isBlank() || room.getBuildingNumber().isBlank()) {
             throw new IllegalArgumentException("宿舍号和楼栋号不能为空。");
         }
-        if (findBuilding(room.getBuildingNumber()).isEmpty()) {
+        Optional<Building> building = findBuilding(room.getBuildingNumber());
+        if (building.isEmpty()) {
             throw new IllegalArgumentException("楼栋不存在，不能添加宿舍。");
+        }
+        if (room.isActive() && !building.get().isActive()) {
+            throw new IllegalArgumentException("所属楼栋已停用，不能启用该宿舍。");
+        }
+        if (!room.getDormNumber().toLowerCase(Locale.ROOT)
+                .startsWith(room.getBuildingNumber().toLowerCase(Locale.ROOT) + "-")) {
+            throw new IllegalArgumentException("宿舍号必须以所属楼栋号加连字符开头。");
+        }
+        if (room.getRoomType().isBlank()) {
+            throw new IllegalArgumentException("宿舍类型不能为空。");
+        }
+        validateGenderType(room.getGenderType());
+        validateStatus(room.getStatus());
+        if (!isGenderCompatible(building.get().getGenderType(), room.getGenderType())) {
+            throw new IllegalArgumentException("宿舍类型必须与所属楼栋类型一致。");
         }
         if (room.getCapacity() <= 0 || room.getCapacity() > 8) {
             throw new IllegalArgumentException("宿舍容量必须在 1 到 8 之间。");
@@ -161,6 +197,28 @@ public class DormInfrastructureService {
         if (room.getFloorNumber() <= 0) {
             throw new IllegalArgumentException("楼层必须大于 0。");
         }
+        if (room.getFloorNumber() > building.get().getTotalFloors()) {
+            throw new IllegalArgumentException("宿舍楼层不能超过楼栋总楼层数。");
+        }
+    }
+
+    private void validateGenderType(String genderType) {
+        if (!"MALE".equalsIgnoreCase(genderType)
+                && !"FEMALE".equalsIgnoreCase(genderType)
+                && !"MIXED".equalsIgnoreCase(genderType)) {
+            throw new IllegalArgumentException("住宿类型只能是男生、女生或混合。");
+        }
+    }
+
+    private void validateStatus(String status) {
+        if (!"ACTIVE".equalsIgnoreCase(status) && !"DISABLED".equalsIgnoreCase(status)) {
+            throw new IllegalArgumentException("状态只能是启用或停用。");
+        }
+    }
+
+    private boolean isGenderCompatible(String buildingGender, String roomGender) {
+        return "MIXED".equalsIgnoreCase(buildingGender)
+                || buildingGender.equalsIgnoreCase(roomGender);
     }
 
     private void replaceBuilding(Building building) {
@@ -180,7 +238,7 @@ public class DormInfrastructureService {
         }
     }
 
-    public String normalizeBuildingNumber(String value) {
+    public synchronized String normalizeBuildingNumber(String value) {
         String normalized = normalizeText(value);
         if (normalized.endsWith("号楼")) {
             return normalized.substring(0, normalized.length() - 2).trim();

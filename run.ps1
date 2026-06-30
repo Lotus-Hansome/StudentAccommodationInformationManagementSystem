@@ -35,10 +35,16 @@ function Get-FreePort($StartPort) {
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 $Sources = Get-ChildItem -Path $SourceDir -Filter "*.java" | ForEach-Object { $_.FullName }
 
-javac -encoding UTF-8 -d $OutDir $Sources
+& javac -encoding UTF-8 -d $OutDir $Sources
+if ($LASTEXITCODE -ne 0) {
+    throw "Java compilation failed with exit code $LASTEXITCODE."
+}
 
 if ($SmokeTest) {
-    java -cp $OutDir com.dormitory.DormitoryManagementSystem --smoke-test
+    & java -cp $OutDir com.dormitory.DormitoryManagementSystem --smoke-test
+    if ($LASTEXITCODE -ne 0) {
+        throw "Smoke test failed with exit code $LASTEXITCODE."
+    }
 } else {
     New-Item -ItemType Directory -Force -Path $LibDir | Out-Null
     if (-not (Test-Path $MysqlDriver)) {
@@ -48,9 +54,9 @@ if ($SmokeTest) {
             -OutFile $MysqlDriver
     }
     if ($Console) {
-        java -cp "$OutDir;$MysqlDriver" com.dormitory.DormitoryManagementSystem --console
+        & java -cp "$OutDir;$MysqlDriver" com.dormitory.DormitoryManagementSystem --console
     } elseif ($Desktop) {
-        java -cp "$OutDir;$MysqlDriver" com.dormitory.DormitoryManagementSystem --desktop
+        & java -cp "$OutDir;$MysqlDriver" com.dormitory.DormitoryManagementSystem --desktop
     } else {
         $requestedPort = 8080
         if ($env:APP_PORT) {
@@ -74,6 +80,9 @@ if ($SmokeTest) {
                 Write-Host "Port $requestedPort is in use. Starting with: http://localhost:$freePort"
             }
         }
-        java -cp "$OutDir;$MysqlDriver" com.dormitory.DormitoryManagementSystem
+        & java -cp "$OutDir;$MysqlDriver" com.dormitory.DormitoryManagementSystem
+    }
+    if ($LASTEXITCODE -ne 0) {
+        throw "Application exited with code $LASTEXITCODE."
     }
 }

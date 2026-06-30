@@ -22,7 +22,7 @@ public class RepairReportService {
         }
     }
 
-    public RepairReport submit(String studentId, String dormNumber, String category, String description) {
+    public synchronized RepairReport submit(String studentId, String dormNumber, String category, String description) {
         String normalizedStudentId = normalizeText(studentId);
         String normalizedDormNumber = normalizeText(dormNumber);
         String normalizedCategory = normalizeText(category);
@@ -48,13 +48,13 @@ public class RepairReportService {
         return report;
     }
 
-    public List<RepairReport> listAll() {
+    public synchronized List<RepairReport> listAll() {
         return reports.stream()
                 .sorted(Comparator.comparing(RepairReport::getCreatedAt).reversed())
                 .collect(Collectors.toList());
     }
 
-    public List<RepairReport> listByStudentId(String studentId) {
+    public synchronized List<RepairReport> listByStudentId(String studentId) {
         String normalizedStudentId = normalizeText(studentId);
         return reports.stream()
                 .filter(report -> report.getStudentId().equalsIgnoreCase(normalizedStudentId))
@@ -62,7 +62,7 @@ public class RepairReportService {
                 .collect(Collectors.toList());
     }
 
-    public void updateStatus(String id, String status, String adminComment) {
+    public synchronized void updateStatus(String id, String status, String adminComment) {
         String normalizedId = normalizeText(id);
         String normalizedComment = normalizeText(adminComment);
         RepairStatus repairStatus = RepairStatus.fromName(status);
@@ -79,7 +79,7 @@ public class RepairReportService {
         save();
     }
 
-    public void cancel(String id, String studentId) {
+    public synchronized void cancel(String id, String studentId) {
         String normalizedId = normalizeText(id);
         String normalizedStudentId = normalizeText(studentId);
         RepairReport report = reports.stream()

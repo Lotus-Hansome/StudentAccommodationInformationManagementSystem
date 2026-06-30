@@ -523,11 +523,12 @@ async function refreshRepairs() {
 
 async function submitRepair(event) {
   event.preventDefault();
-  const result = await api("/api/repairs", { method: "POST", body: new FormData(event.currentTarget) });
-  event.currentTarget.reset();
+  const form = event.currentTarget;
+  const result = await api("/api/repairs", { method: "POST", body: new FormData(form) });
+  form.reset();
+  toast(`报修已提交：${result.id}`);
   if (state.role !== "ADMIN") await loadStudentHome();
   navigate("repairs");
-  toast(`报修已提交：${result.id}`);
 }
 
 function renderRepairs() {
@@ -694,13 +695,14 @@ function editBuilding(buildingNumber) {
 
 async function saveBuilding(event) {
   event.preventDefault();
-  await api("/api/buildings", { method: "POST", body: new FormData(event.currentTarget) });
-  const editing = event.currentTarget.dataset.editing === "true";
-  event.currentTarget.reset();
-  event.currentTarget.dataset.editing = "";
-  event.currentTarget.totalFloors.value = 6;
-  await loadBuildings();
+  const form = event.currentTarget;
+  const editing = form.dataset.editing === "true";
+  await api("/api/buildings", { method: "POST", body: new FormData(form) });
   toast(editing ? "楼栋信息修改成功" : "楼栋信息保存成功");
+  form.reset();
+  form.dataset.editing = "";
+  form.totalFloors.value = 6;
+  await loadBuildings();
 }
 
 async function loadRooms() {
@@ -755,14 +757,15 @@ function editRoom(dormNumber) {
 
 async function saveRoom(event) {
   event.preventDefault();
-  await api("/api/rooms", { method: "POST", body: new FormData(event.currentTarget) });
-  const editing = event.currentTarget.dataset.editing === "true";
-  event.currentTarget.reset();
-  event.currentTarget.dataset.editing = "";
-  event.currentTarget.roomType.value = "标准四人间";
-  event.currentTarget.capacity.value = 4;
+  const form = event.currentTarget;
+  const editing = form.dataset.editing === "true";
+  const result = await api("/api/rooms", { method: "POST", body: new FormData(form) });
+  toast(result.message || (editing ? "宿舍信息修改成功" : "宿舍信息保存成功"));
+  form.reset();
+  form.dataset.editing = "";
+  form.roomType.value = "标准四人间";
+  form.capacity.value = 4;
   await loadRooms();
-  toast(editing ? "宿舍信息修改成功" : "宿舍信息保存成功");
 }
 
 async function loadUsers() {
@@ -920,10 +923,11 @@ async function refreshModelConfig() {
 
 async function saveModelConfig(event) {
   event.preventDefault();
-  const body = new FormData(event.currentTarget);
+  const form = event.currentTarget;
+  const body = new FormData(form);
   body.set("action", "save");
   const data = await api("/api/model-config", { method: "POST", body });
-  event.currentTarget.reset();
+  form.reset();
   setModelEditorVisible(false);
   updateModelConfigStatus(data);
   toast("模型服务配置已保存，可在列表中选择启用");
@@ -1251,16 +1255,17 @@ async function api(path, options = {}) {
   const response = await fetch(path, { ...options, headers, body });
   const data = await response.json();
   if (!response.ok || data.success === false) {
-    toast(data.message || "操作失败");
+    toast(data.message || "操作失败", "error");
     throw new Error(data.message || "操作失败");
   }
   return data;
 }
 
 let toastTimer = 0;
-function toast(message) {
+function toast(message, kind = "success") {
   const box = $("#toast");
   box.textContent = message;
+  box.dataset.kind = kind;
   box.classList.remove("hidden");
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => box.classList.add("hidden"), 2800);

@@ -969,16 +969,42 @@ code {
 
 .toast {
     position: fixed;
-    right: 22px;
-    bottom: 22px;
-    z-index: 10;
-    max-width: 380px;
-    padding: 12px 14px;
-    border: 1px solid var(--line);
+    top: 50%;
+    left: 50%;
+    z-index: 100;
+    width: max-content;
+    min-width: 220px;
+    max-width: min(440px, calc(100vw - 32px));
+    padding: 14px 20px;
+    transform: translate(-50%, -50%);
+    border: 1px solid #2f415e;
     border-radius: var(--radius);
-    background: #fff;
-    color: var(--text);
-    box-shadow: var(--shadow);
+    background: #17243a;
+    color: #fff;
+    box-shadow: 0 18px 48px rgba(15, 23, 42, 0.3);
+    text-align: center;
+    line-height: 1.6;
+    pointer-events: none;
+}
+
+.toast[data-kind="error"] {
+    border-color: #d95c5c;
+    background: #8f2f37;
+}
+
+.toast:not(.hidden) {
+    animation: toast-in 180ms ease-out;
+}
+
+@keyframes toast-in {
+    from {
+        opacity: 0;
+        transform: translate(-50%, calc(-50% + 10px));
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, -50%);
+    }
 }
 
 .modal {

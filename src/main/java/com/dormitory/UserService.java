@@ -6,12 +6,18 @@ import java.util.Optional;
 
 public class UserService {
     private final UserRepository repository;
+    private final StudentDormService studentDormService;
 
     public UserService(UserRepository repository) {
-        this.repository = repository;
+        this(repository, null);
     }
 
-    public List<User> listAll() {
+    public UserService(UserRepository repository, StudentDormService studentDormService) {
+        this.repository = repository;
+        this.studentDormService = studentDormService;
+    }
+
+    public synchronized List<User> listAll() {
         try {
             return repository.listAll();
         } catch (IOException e) {
@@ -19,7 +25,15 @@ public class UserService {
         }
     }
 
-    public void create(String username, String password, String role, String studentId, boolean enabled) {
+    public synchronized Optional<User> findByUsername(String username) {
+        try {
+            return repository.findByUsername(normalizeText(username));
+        } catch (IOException e) {
+            throw new IllegalStateException("读取用户失败：" + e.getMessage(), e);
+        }
+    }
+
+    public synchronized void create(String username, String password, String role, String studentId, boolean enabled) {
         String requestedUsername = normalizeText(username);
         String normalizedPassword = normalizeText(password);
         UserRole userRole = parseRole(role);
@@ -46,7 +60,7 @@ public class UserService {
         }
     }
 
-    public void update(String username, String role, String studentId, boolean enabled, String currentUsername) {
+    public synchronized void update(String username, String role, String studentId, boolean enabled, String currentUsername) {
         String normalizedUsername = normalizeText(username);
         UserRole userRole = parseRole(role);
         if (normalizedUsername.isBlank()) {
@@ -76,7 +90,7 @@ public class UserService {
         }
     }
 
-    public void delete(String username, String currentUsername) {
+    public synchronized void delete(String username, String currentUsername) {
         String normalizedUsername = normalizeText(username);
         if (normalizedUsername.isBlank()) {
             throw new IllegalArgumentException("用户名不能为空。");
@@ -96,7 +110,7 @@ public class UserService {
         }
     }
 
-    public void changePassword(String username, String oldPassword, String newPassword) {
+    public synchronized void changePassword(String username, String oldPassword, String newPassword) {
         String normalizedNewPassword = normalizeText(newPassword);
         if (normalizedNewPassword.length() < 6) {
             throw new IllegalArgumentException("新密码至少需要 6 位。");
@@ -113,7 +127,7 @@ public class UserService {
         }
     }
 
-    public void resetPassword(String username, String newPassword) {
+    public synchronized void resetPassword(String username, String newPassword) {
         String normalizedUsername = normalizeText(username);
         String normalizedPassword = normalizeText(newPassword);
         if (normalizedUsername.isBlank() || normalizedPassword.length() < 6) {
@@ -134,6 +148,32 @@ public class UserService {
         return "ADMIN".equalsIgnoreCase(normalizeText(role)) ? UserRole.ADMIN : UserRole.USER;
     }
 
+    public synchronized Optional<String> disableStudentAccount(String studentId) {
+        String normalizedStudentId = normalizeText(studentId);
+        if (normalizedStudentId.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            Optional<User> account = repository.listAll().stream()
+                    .filter(user -> user.getRole() == UserRole.USER)
+                    .filter(user -> user.getStudentId().equalsIgnoreCase(normalizedStudentId))
+                    .findFirst();
+            if (account.isEmpty() || !account.get().isEnabled()) {
+                return account.map(User::getUsername);
+            }
+            User user = account.get();
+            repository.update(new User(
+                    user.getUsername(),
+                    user.getPasswordHash(),
+                    user.getRole(),
+                    user.getStudentId(),
+                    false));
+            return Optional.of(user.getUsername());
+        } catch (IOException e) {
+            throw new IllegalStateException("禁用学生账号失败：" + e.getMessage(), e);
+        }
+    }
+
     private boolean hasOtherEnabledAdmin(String username) throws IOException {
         return repository.listAll().stream()
                 .anyMatch(user -> !user.getUsername().equalsIgnoreCase(username)
@@ -151,6 +191,9 @@ public class UserService {
         }
         if (normalizedStudentId.isBlank()) {
             throw new IllegalArgumentException("普通用户必须绑定学号。");
+        }
+        if (studentDormService != null && studentDormService.findByStudentId(normalizedStudentId).isEmpty()) {
+            throw new IllegalArgumentException("学号不存在，不能创建或绑定学生账号。");
         }
         boolean alreadyBound = repository.listAll().stream()
                 .anyMatch(user -> !user.getUsername().equalsIgnoreCase(username)

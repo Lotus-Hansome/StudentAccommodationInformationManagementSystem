@@ -34,7 +34,7 @@ public class StudentDormService {
         }
     }
 
-    public void add(StudentDormRecord record) {
+    public synchronized void add(StudentDormRecord record) {
         normalize(record);
         validateRequired(record);
         if (findByStudentId(record.getStudentId()).isPresent()) {
@@ -44,11 +44,15 @@ public class StudentDormService {
             throw new IllegalArgumentException("目标宿舍床位已被占用。");
         }
         record.setDormPhone(resolveDormPhone(record.getDormNumber(), record.getDormPhone()));
-        records.add(record);
-        save();
+        try {
+            repository.insert(record);
+            records.add(record);
+        } catch (IOException e) {
+            throw new IllegalStateException("保存学生宿舍数据失败：" + e.getMessage(), e);
+        }
     }
 
-    public void update(StudentDormRecord record) {
+    public synchronized void update(StudentDormRecord record) {
         normalize(record);
         validateRequired(record);
         StudentDormRecord existing = findByStudentId(record.getStudentId())
@@ -57,35 +61,38 @@ public class StudentDormService {
             throw new IllegalArgumentException("目标宿舍床位已被占用。");
         }
         record.setDormPhone(resolveDormPhone(record.getDormNumber(), record.getDormPhone()));
-        existing.setName(record.getName());
-        existing.setDepartment(record.getDepartment());
-        existing.setClassName(record.getClassName());
-        existing.setDormNumber(record.getDormNumber());
-        existing.setDormPhone(record.getDormPhone());
-        existing.setBedNumber(record.getBedNumber());
-        save();
+        try {
+            repository.update(record);
+            replaceRecord(existing, record);
+        } catch (IOException e) {
+            throw new IllegalStateException("保存学生宿舍数据失败：" + e.getMessage(), e);
+        }
     }
 
-    public boolean deleteByDormAndStudent(String dormNumber, String studentId) {
+    public synchronized boolean deleteByDormAndStudent(String dormNumber, String studentId) {
         String normalizedDormNumber = normalizeText(dormNumber);
         String normalizedStudentId = normalizeText(studentId);
-        boolean removed = records.removeIf(record ->
-                record.getDormNumber().equalsIgnoreCase(normalizedDormNumber)
-                        && record.getStudentId().equalsIgnoreCase(normalizedStudentId));
-        if (removed) {
-            save();
+        try {
+            boolean removed = repository.deleteByDormAndStudent(normalizedDormNumber, normalizedStudentId);
+            if (removed) {
+                records.removeIf(record ->
+                        record.getDormNumber().equalsIgnoreCase(normalizedDormNumber)
+                                && record.getStudentId().equalsIgnoreCase(normalizedStudentId));
+            }
+            return removed;
+        } catch (IOException e) {
+            throw new IllegalStateException("删除学生宿舍数据失败：" + e.getMessage(), e);
         }
-        return removed;
     }
 
-    public Optional<StudentDormRecord> findByStudentId(String studentId) {
+    public synchronized Optional<StudentDormRecord> findByStudentId(String studentId) {
         String normalizedStudentId = normalizeText(studentId);
         return records.stream()
                 .filter(record -> record.getStudentId().equalsIgnoreCase(normalizedStudentId))
                 .findFirst();
     }
 
-    public List<StudentDormRecord> findByDormNumber(String dormNumber) {
+    public synchronized List<StudentDormRecord> findByDormNumber(String dormNumber) {
         String normalizedDormNumber = normalizeText(dormNumber);
         return records.stream()
                 .filter(record -> record.getDormNumber().equalsIgnoreCase(normalizedDormNumber))
@@ -93,7 +100,7 @@ public class StudentDormService {
                 .collect(Collectors.toList());
     }
 
-    public List<StudentDormRecord> findByDepartmentAndClass(String department, String className) {
+    public synchronized List<StudentDormRecord> findByDepartmentAndClass(String department, String className) {
         String normalizedDepartment = normalizeText(department);
         String normalizedClassName = normalizeText(className);
         return records.stream()
@@ -105,14 +112,14 @@ public class StudentDormService {
                 .collect(Collectors.toList());
     }
 
-    public List<StudentDormRecord> listAll() {
+    public synchronized List<StudentDormRecord> listAll() {
         return records.stream()
                 .sorted(Comparator.comparing(StudentDormRecord::getDormNumber)
                         .thenComparing(StudentDormRecord::getBedNumber))
                 .collect(Collectors.toList());
     }
 
-    public List<StudentDormRecord> sortByDepartmentAndClass() {
+    public synchronized List<StudentDormRecord> sortByDepartmentAndClass() {
         return records.stream()
                 .sorted(Comparator.comparing(StudentDormRecord::getDepartment)
                         .thenComparing(StudentDormRecord::getClassName)
@@ -120,7 +127,7 @@ public class StudentDormService {
                 .collect(Collectors.toList());
     }
 
-    public PageResult<StudentDormRecord> search(StudentSearchCriteria criteria) {
+    public synchronized PageResult<StudentDormRecord> search(StudentSearchCriteria criteria) {
         if (repository instanceof MysqlStudentRepository mysqlRepository) {
             try {
                 return mysqlRepository.search(criteria);
@@ -137,26 +144,36 @@ public class StudentDormService {
         return new PageResult<>(filtered.subList(from, to), total, page, pageSize);
     }
 
-    public void updateDorm(String studentId, String targetDormNumber, String targetDormPhone, String targetBedNumber) {
+    public synchronized void updateDorm(String studentId, String targetDormNumber, String targetDormPhone, String targetBedNumber) {
         String normalizedStudentId = normalizeText(studentId);
         String normalizedDormNumber = normalizeText(targetDormNumber);
         String normalizedDormPhone = normalizeText(targetDormPhone);
         String normalizedBedNumber = normalizeText(targetBedNumber);
         StudentDormRecord record = findByStudentId(normalizedStudentId)
                 .orElseThrow(() -> new IllegalArgumentException("未找到该学生，无法更新宿舍。"));
-        if (isBlank(normalizedDormNumber) || isBlank(normalizedDormPhone) || isBlank(normalizedBedNumber)) {
-            throw new IllegalArgumentException("目标宿舍、宿舍电话和床位不能为空。");
+        if (isBlank(normalizedDormNumber) || isBlank(normalizedBedNumber)) {
+            throw new IllegalArgumentException("目标宿舍和床位不能为空。");
         }
         if (!isBedAvailable(normalizedDormNumber, normalizedBedNumber, normalizedStudentId)) {
             throw new IllegalArgumentException("目标宿舍床位已被占用。");
         }
-        record.setDormNumber(normalizedDormNumber);
-        record.setDormPhone(resolveDormPhone(normalizedDormNumber, normalizedDormPhone));
-        record.setBedNumber(normalizedBedNumber);
-        save();
+        StudentDormRecord updated = new StudentDormRecord(
+                record.getStudentId(),
+                record.getName(),
+                record.getDepartment(),
+                record.getClassName(),
+                normalizedDormNumber,
+                resolveDormPhone(normalizedDormNumber, normalizedDormPhone),
+                normalizedBedNumber);
+        try {
+            repository.update(updated);
+            replaceRecord(record, updated);
+        } catch (IOException e) {
+            throw new IllegalStateException("保存学生宿舍数据失败：" + e.getMessage(), e);
+        }
     }
 
-    public boolean isBedAvailable(String dormNumber, String bedNumber, String excludingStudentId) {
+    public synchronized boolean isBedAvailable(String dormNumber, String bedNumber, String excludingStudentId) {
         String normalizedDormNumber = normalizeText(dormNumber);
         String normalizedBedNumber = normalizeText(bedNumber);
         String normalizedExcludingStudentId = normalizeText(excludingStudentId);
@@ -166,15 +183,20 @@ public class StudentDormService {
                         && !record.getStudentId().equalsIgnoreCase(normalizedExcludingStudentId));
     }
 
-    public DormStatistics statisticsByDorm(String dormNumber) {
+    public synchronized DormStatistics statisticsByDorm(String dormNumber) {
         List<StudentDormRecord> matched = findByDormNumber(dormNumber);
-        int capacity = infrastructureService == null || !infrastructureService.hasInfrastructureData()
-                ? DEFAULT_BEDS_PER_DORM
-                : infrastructureService.roomCapacity(dormNumber);
-        return buildStatistics("宿舍", dormNumber, matched, capacity);
+        boolean hasInfrastructure = infrastructureService != null && infrastructureService.hasInfrastructureData();
+        Optional<DormRoom> room = hasInfrastructure ? infrastructureService.findRoom(dormNumber) : Optional.empty();
+        int capacity = hasInfrastructure
+                ? room.filter(DormRoom::isActive).map(DormRoom::getCapacity).orElse(0)
+                : (matched.isEmpty() ? 0 : DEFAULT_BEDS_PER_DORM);
+        int roomCount = hasInfrastructure
+                ? (room.filter(DormRoom::isActive).isPresent() ? 1 : 0)
+                : (matched.isEmpty() ? 0 : 1);
+        return buildStatistics("宿舍", dormNumber, matched, roomCount, capacity);
     }
 
-    public DormStatistics statisticsByBuilding(String buildingNumber) {
+    public synchronized DormStatistics statisticsByBuilding(String buildingNumber) {
         String trimmed = infrastructureService == null
                 ? buildingNumber.trim()
                 : infrastructureService.normalizeBuildingNumber(buildingNumber);
@@ -190,24 +212,24 @@ public class StudentDormService {
         int capacity = infrastructureService == null || !infrastructureService.hasInfrastructureData()
                 ? rooms.size() * DEFAULT_BEDS_PER_DORM
                 : infrastructureService.buildingCapacity(trimmed);
-        return buildStatistics("楼栋", trimmed, matched, capacity);
+        return buildStatistics("楼栋", trimmed, matched, rooms.size(), capacity);
     }
 
-    public DormStatistics statisticsAll() {
+    public synchronized DormStatistics statisticsAll() {
         Set<String> rooms = infrastructureService == null || !infrastructureService.hasInfrastructureData()
                 ? records.stream().map(StudentDormRecord::getDormNumber).collect(Collectors.toCollection(TreeSet::new))
                 : infrastructureService.activeDormNumbers();
         int capacity = infrastructureService == null || !infrastructureService.hasInfrastructureData()
                 ? rooms.size() * DEFAULT_BEDS_PER_DORM
                 : infrastructureService.totalCapacity();
-        return buildStatistics("全校", "全部宿舍", records, capacity);
+        return buildStatistics("全校", "全部宿舍", records, rooms.size(), capacity);
     }
 
-    public List<DormOccupancySummary> buildingOccupancySummaries() {
+    public synchronized List<DormOccupancySummary> buildingOccupancySummaries() {
         return buildingOccupancySummaries("");
     }
 
-    public List<DormOccupancySummary> buildingOccupancySummaries(String buildingNumber) {
+    public synchronized List<DormOccupancySummary> buildingOccupancySummaries(String buildingNumber) {
         String normalizedBuildingNumber = normalizeBuildingNumber(buildingNumber);
         if (infrastructureService != null && infrastructureService.hasInfrastructureData()) {
             Map<String, List<DormRoom>> roomsByBuilding = infrastructureService.activeRoomsByBuilding();
@@ -252,11 +274,11 @@ public class StudentDormService {
                 .collect(Collectors.toList());
     }
 
-    public List<DormOccupancySummary> dormOccupancySummaries() {
+    public synchronized List<DormOccupancySummary> dormOccupancySummaries() {
         return dormOccupancySummaries("");
     }
 
-    public List<DormOccupancySummary> dormOccupancySummaries(String dormNumber) {
+    public synchronized List<DormOccupancySummary> dormOccupancySummaries(String dormNumber) {
         String normalizedDormNumber = normalizeText(dormNumber);
         if (infrastructureService != null && infrastructureService.hasInfrastructureData()) {
             return infrastructureService.listRooms("", normalizedDormNumber).stream()
@@ -295,15 +317,63 @@ public class StudentDormService {
                 .collect(Collectors.toList());
     }
 
-    private DormStatistics buildStatistics(String scopeType, String scopeValue, List<StudentDormRecord> matched, int capacity) {
+    public synchronized void validateRoomChange(DormRoom room) {
+        List<StudentDormRecord> occupants = findByDormNumber(room.getDormNumber());
+        if (!room.isActive() && !occupants.isEmpty()) {
+            throw new IllegalArgumentException("该宿舍仍有学生入住，不能停用。");
+        }
+        for (StudentDormRecord occupant : occupants) {
+            int bedNumber;
+            try {
+                bedNumber = Integer.parseInt(occupant.getBedNumber());
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("宿舍存在非数字床位，不能直接修改容量。");
+            }
+            if (bedNumber < 1 || bedNumber > room.getCapacity()) {
+                throw new IllegalArgumentException(
+                        "学生 " + occupant.getStudentId() + " 当前使用 " + occupant.getBedNumber()
+                                + " 号床，宿舍容量不能缩减为 " + room.getCapacity() + "。");
+            }
+        }
+    }
+
+    public synchronized void synchronizeRoomPhone(DormRoom room) {
+        List<StudentDormRecord> occupants = findByDormNumber(room.getDormNumber());
+        if (occupants.isEmpty()) {
+            return;
+        }
+        for (StudentDormRecord occupant : occupants) {
+            StudentDormRecord updated = new StudentDormRecord(
+                    occupant.getStudentId(),
+                    occupant.getName(),
+                    occupant.getDepartment(),
+                    occupant.getClassName(),
+                    occupant.getDormNumber(),
+                    room.getPhone(),
+                    occupant.getBedNumber());
+            try {
+                repository.update(updated);
+                replaceRecord(occupant, updated);
+            } catch (IOException e) {
+                throw new IllegalStateException("同步宿舍电话失败：" + e.getMessage(), e);
+            }
+        }
+    }
+
+    public synchronized String dormPhoneFor(String dormNumber, String fallbackPhone) {
+        return resolveDormPhone(normalizeText(dormNumber), normalizeText(fallbackPhone));
+    }
+
+    private DormStatistics buildStatistics(
+            String scopeType,
+            String scopeValue,
+            List<StudentDormRecord> matched,
+            int roomCount,
+            int capacity) {
         Map<String, Integer> departmentCounts = new LinkedHashMap<>();
         matched.stream()
                 .collect(Collectors.groupingBy(StudentDormRecord::getDepartment, TreeMap::new, Collectors.counting()))
                 .forEach((department, count) -> departmentCounts.put(department, count.intValue()));
-        int roomCount = matched.stream()
-                .map(StudentDormRecord::getDormNumber)
-                .collect(Collectors.toSet())
-                .size();
         int vacantBeds = Math.max(0, capacity - matched.size());
         return new DormStatistics(scopeType, scopeValue, matched.size(), roomCount, capacity, vacantBeds, departmentCounts);
     }
@@ -347,13 +417,13 @@ public class StudentDormService {
     }
 
     private String resolveDormPhone(String dormNumber, String inputPhone) {
-        if (!isBlank(inputPhone)) {
-            return normalizeText(inputPhone);
+        if (infrastructureService != null && infrastructureService.hasInfrastructureData()) {
+            String configuredPhone = infrastructureService.roomPhone(dormNumber);
+            if (!isBlank(configuredPhone)) {
+                return configuredPhone;
+            }
         }
-        if (infrastructureService == null || !infrastructureService.hasInfrastructureData()) {
-            return "";
-        }
-        return infrastructureService.roomPhone(dormNumber);
+        return normalizeText(inputPhone);
     }
 
     private void validateRequired(StudentDormRecord record) {
@@ -443,11 +513,10 @@ public class StudentDormService {
         return value == null ? "" : value.trim();
     }
 
-    private void save() {
-        try {
-            repository.save(records);
-        } catch (IOException e) {
-            throw new IllegalStateException("保存学生宿舍数据失败：" + e.getMessage(), e);
+    private void replaceRecord(StudentDormRecord existing, StudentDormRecord replacement) {
+        int index = records.indexOf(existing);
+        if (index >= 0) {
+            records.set(index, replacement);
         }
     }
 }

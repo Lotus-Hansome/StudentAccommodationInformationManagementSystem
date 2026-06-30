@@ -60,14 +60,23 @@ public class MysqlChangeRequestRepository implements ChangeRequestRepository {
                     target_dorm_number, target_dorm_phone, target_bed_number,
                     reason, status, created_at, handled_at, admin_comment
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                    student_id = VALUES(student_id),
+                    current_dorm_number = VALUES(current_dorm_number),
+                    current_bed_number = VALUES(current_bed_number),
+                    target_dorm_number = VALUES(target_dorm_number),
+                    target_dorm_phone = VALUES(target_dorm_phone),
+                    target_bed_number = VALUES(target_bed_number),
+                    reason = VALUES(reason),
+                    status = VALUES(status),
+                    created_at = VALUES(created_at),
+                    handled_at = VALUES(handled_at),
+                    admin_comment = VALUES(admin_comment)
                 """;
         Connection connection = null;
         try {
             connection = connectionFactory.openConnection();
             connection.setAutoCommit(false);
-            try (Statement deleteStatement = connection.createStatement()) {
-                deleteStatement.executeUpdate("DELETE FROM change_requests");
-            }
             try (PreparedStatement statement = connection.prepareStatement(insertSql)) {
                 for (DormChangeRequest request : requests) {
                     statement.setString(1, request.getId());

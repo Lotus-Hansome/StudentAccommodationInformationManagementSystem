@@ -54,14 +54,20 @@ public class MysqlRepairReportRepository implements RepairReportRepository {
                     id, student_id, dorm_number, category, description,
                     status, created_at, handled_at, admin_comment
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                    student_id = VALUES(student_id),
+                    dorm_number = VALUES(dorm_number),
+                    category = VALUES(category),
+                    description = VALUES(description),
+                    status = VALUES(status),
+                    created_at = VALUES(created_at),
+                    handled_at = VALUES(handled_at),
+                    admin_comment = VALUES(admin_comment)
                 """;
         Connection connection = null;
         try {
             connection = connectionFactory.openConnection();
             connection.setAutoCommit(false);
-            try (Statement deleteStatement = connection.createStatement()) {
-                deleteStatement.executeUpdate("DELETE FROM repair_reports");
-            }
             try (PreparedStatement statement = connection.prepareStatement(insertSql)) {
                 for (RepairReport report : reports) {
                     statement.setString(1, report.getId());
