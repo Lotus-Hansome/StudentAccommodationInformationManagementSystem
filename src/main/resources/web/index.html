@@ -344,7 +344,7 @@
                     <form id="userForm" class="form-grid">
                         <input type="hidden" name="mode" value="create">
                         <label id="userUsernameRow"><span>管理员用户名</span><input name="username"></label>
-                        <label id="userPasswordRow"><span>初始密码</span><input name="password" type="password"></label>
+                        <label id="userPasswordRow"><span>初始密码</span><input name="password" type="password" minlength="6"></label>
                         <label><span>角色</span><select name="role"><option value="USER">普通用户</option><option value="ADMIN">管理员</option></select></label>
                         <label id="userStudentIdRow"><span>绑定学号</span><input name="studentId" required></label>
                         <label class="check-row"><input name="enabled" type="checkbox" checked><span>启用账号</span></label>

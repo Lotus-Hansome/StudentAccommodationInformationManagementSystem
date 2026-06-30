@@ -1435,8 +1435,26 @@ async function api(path, options = {}) {
     body = new URLSearchParams(body);
     headers["Content-Type"] = "application/x-www-form-urlencoded;charset=UTF-8";
   }
-  const response = await fetch(path, { ...options, headers, body });
-  const data = await response.json();
+  let response;
+  try {
+    response = await fetch(path, { ...options, headers, body });
+  } catch (error) {
+    toast("无法连接系统服务，请检查服务是否已启动", "error");
+    throw error;
+  }
+  let data;
+  try {
+    data = await response.json();
+  } catch (error) {
+    toast("系统服务返回了无法识别的数据", "error");
+    throw error;
+  }
+  if (response.status === 401 && state.token) {
+    const message = data.message || "登录已过期，请重新登录";
+    await logout({ silent: true });
+    toast(message, "error");
+    throw new Error(message);
+  }
   if (!response.ok || data.success === false) {
     toast(data.message || "操作失败", "error");
     throw new Error(data.message || "操作失败");
@@ -1464,5 +1482,10 @@ function escapeHtml(value) {
 }
 
 function escapeJs(value) {
-  return String(value ?? "").replaceAll("\\", "\\\\").replaceAll("'", "\\'");
+  const escapedForJavaScript = String(value ?? "")
+    .replaceAll("\\", "\\\\")
+    .replaceAll("'", "\\'")
+    .replaceAll("\r", "\\r")
+    .replaceAll("\n", "\\n");
+  return escapeHtml(escapedForJavaScript);
 }

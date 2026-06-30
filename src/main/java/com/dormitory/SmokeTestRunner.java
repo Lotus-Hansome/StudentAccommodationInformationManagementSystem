@@ -61,6 +61,10 @@ public final class SmokeTestRunner {
                 () -> infrastructureService.saveRoom(
                         new DormRoom("9-104", "9", 1, "Test room", "MIXED", 4, "0571-9104", "UNKNOWN")),
                 "room status should only accept supported values");
+        expectFailure(
+                () -> infrastructureService.saveRoom(
+                        new DormRoom("9-104", "9", 1, "Test room", "MIXED", 4, "", "ACTIVE")),
+                "room phone should be required");
 
         expectFailure(
                 () -> requestService.submit("T003", "9-103", "0571-9103", "1", " "),
@@ -104,6 +108,12 @@ public final class SmokeTestRunner {
 
         InMemoryUserRepository userRepository = new InMemoryUserRepository();
         UserService userService = new UserService(userRepository, studentService);
+        expectFailure(
+                () -> userService.create("short-password", "123", "ADMIN", "", true),
+                "initial password should require at least six characters");
+        expectFailure(
+                () -> userService.create("invalid-role", "admin234", "OPERATOR", "", true),
+                "unsupported user role should be rejected");
         userService.create("admin2", "admin234", "ADMIN", "", true);
         long enabledAdmins = userService.listAll().stream()
                 .filter(user -> user.getRole() == UserRole.ADMIN && user.isEnabled())

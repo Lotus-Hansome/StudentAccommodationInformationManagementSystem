@@ -93,7 +93,8 @@ public class DormitoryWebServer {
         } catch (IllegalArgumentException e) {
             sendJson(exchange, 400, "{\"success\":false,\"message\":" + WebJson.quote(e.getMessage()) + "}");
         } catch (RuntimeException e) {
-            sendJson(exchange, 500, "{\"success\":false,\"message\":" + WebJson.quote(e.getMessage()) + "}");
+            e.printStackTrace(System.err);
+            sendJson(exchange, 500, "{\"success\":false,\"message\":\"系统处理请求失败，请稍后重试。\"}");
         }
     }
 
@@ -199,6 +200,7 @@ public class DormitoryWebServer {
     }
 
     private void login(HttpExchange exchange) throws IOException {
+        cleanupExpiredSecurityState();
         Map<String, String> form = readForm(exchange);
         String username = form.getOrDefault("username", "").trim();
         String password = form.getOrDefault("password", "");
@@ -1112,6 +1114,14 @@ public class DormitoryWebServer {
         });
     }
 
+    private void cleanupExpiredSecurityState() {
+        LocalDateTime now = LocalDateTime.now();
+        sessions.entrySet().removeIf(entry -> entry.getValue().expiresAt.isBefore(now));
+        long currentMillis = System.currentTimeMillis();
+        loginAttempts.entrySet().removeIf(entry ->
+                currentMillis - entry.getValue().windowStartedAt > LOGIN_WINDOW_MILLIS);
+    }
+
     private Map<String, String> readForm(HttpExchange exchange) throws IOException {
         String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
         return parseQuery(body);
@@ -1175,6 +1185,10 @@ public class DormitoryWebServer {
         Headers headers = exchange.getResponseHeaders();
         headers.set("Content-Type", contentType);
         headers.set("Cache-Control", "no-store");
+        headers.set("X-Content-Type-Options", "nosniff");
+        headers.set("X-Frame-Options", "DENY");
+        headers.set("Referrer-Policy", "no-referrer");
+        headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
         exchange.sendResponseHeaders(statusCode, bytes.length);
         try (OutputStream outputStream = exchange.getResponseBody()) {
             outputStream.write(bytes);

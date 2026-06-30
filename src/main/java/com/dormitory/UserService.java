@@ -37,8 +37,8 @@ public class UserService {
         String requestedUsername = normalizeText(username);
         String normalizedPassword = normalizeText(password);
         UserRole userRole = parseRole(role);
-        if (normalizedPassword.isBlank()) {
-            throw new IllegalArgumentException("初始密码不能为空。");
+        if (normalizedPassword.length() < 6) {
+            throw new IllegalArgumentException("初始密码至少需要 6 位。");
         }
         if (userRole == UserRole.ADMIN && requestedUsername.isBlank()) {
             throw new IllegalArgumentException("管理员用户名不能为空。");
@@ -145,7 +145,14 @@ public class UserService {
     }
 
     private UserRole parseRole(String role) {
-        return "ADMIN".equalsIgnoreCase(normalizeText(role)) ? UserRole.ADMIN : UserRole.USER;
+        String normalizedRole = normalizeText(role);
+        if ("ADMIN".equalsIgnoreCase(normalizedRole)) {
+            return UserRole.ADMIN;
+        }
+        if ("USER".equalsIgnoreCase(normalizedRole)) {
+            return UserRole.USER;
+        }
+        throw new IllegalArgumentException("用户角色只能是管理员或普通用户。");
     }
 
     public synchronized Optional<String> disableStudentAccount(String studentId) {

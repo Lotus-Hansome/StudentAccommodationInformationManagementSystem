@@ -196,6 +196,9 @@ public class DormInfrastructureService {
         if (room.getRoomType().isBlank()) {
             throw new IllegalArgumentException("宿舍类型不能为空。");
         }
+        if (room.getPhone().isBlank()) {
+            throw new IllegalArgumentException("宿舍电话不能为空。");
+        }
         validateGenderType(room.getGenderType());
         validateStatus(room.getStatus());
         if (!isGenderCompatible(building.get().getGenderType(), room.getGenderType())) {
