@@ -81,6 +81,16 @@ public class DormInfrastructureService {
                         && bed.isActive());
     }
 
+    public synchronized List<String> activeBedNumbers(String dormNumber) {
+        String normalizedDorm = normalizeText(dormNumber);
+        return beds.stream()
+                .filter(DormBed::isActive)
+                .filter(bed -> bed.getDormNumber().equalsIgnoreCase(normalizedDorm))
+                .map(DormBed::getBedNumber)
+                .sorted(this::compareNumbersAsText)
+                .collect(Collectors.toList());
+    }
+
     public synchronized int roomCapacity(String dormNumber) {
         return findRoom(dormNumber).map(DormRoom::getCapacity).orElse(StudentDormService.DEFAULT_BEDS_PER_DORM);
     }

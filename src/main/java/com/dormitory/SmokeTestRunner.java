@@ -38,6 +38,8 @@ public final class SmokeTestRunner {
         require(studentService.dormOccupancySummaries().size() == 3, "dorm occupancy summary should include empty rooms");
         require(studentService.buildingOccupancySummaries("9").size() == 1, "filtered building occupancy summary failed");
         require(studentService.dormOccupancySummaries("9-101").size() == 1, "filtered dorm occupancy summary failed");
+        require(infrastructureService.activeBedNumbers("9-101").equals(List.of("1", "2", "3", "4")),
+                "active room bed numbers should be available for vacancy display");
         DormOccupancySummary buildingSummary = studentService.buildingOccupancySummaries().get(0);
         require(buildingSummary.getRoomCount() == 3 && buildingSummary.getTotalCapacity() == 12 && buildingSummary.getVacantBeds() == 9,
                 "building vacant bed calculation failed");

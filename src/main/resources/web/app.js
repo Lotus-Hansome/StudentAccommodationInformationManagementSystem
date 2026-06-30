@@ -723,7 +723,7 @@ async function searchRooms() {
 function renderRooms() {
   const tbody = $("#roomsTable");
   if (!state.rooms.length) {
-    tbody.innerHTML = `<tr><td colspan="7">暂无宿舍</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10">暂无宿舍</td></tr>`;
     return;
   }
   tbody.innerHTML = state.rooms.map((room) => `
@@ -732,6 +732,9 @@ function renderRooms() {
       <td>${escapeHtml(room.buildingNumber)}</td>
       <td>${room.floorNumber}</td>
       <td>${room.capacity}</td>
+      <td>${room.occupiedBeds}</td>
+      <td><div class="bed-availability"><strong>${room.vacantBeds} 个</strong><span>${room.vacantBedNumbers.length ? `${room.vacantBedNumbers.map((bed) => `${escapeHtml(bed)}号`).join("、")}` : (room.status === "ACTIVE" ? "无空余" : "不可分配")}</span></div></td>
+      <td>${room.lockedBeds || 0}</td>
       <td>${escapeHtml(room.phone)}</td>
       <td>${statusText(room.status)}</td>
       <td><button class="btn" onclick="editRoom('${escapeJs(room.dormNumber)}')"><svg><use href="#icon-edit"></use></svg>编辑</button></td>

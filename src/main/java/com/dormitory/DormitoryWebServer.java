@@ -15,9 +15,12 @@ import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -826,9 +829,29 @@ public class DormitoryWebServer {
     }
 
     private String roomsJson(List<DormRoom> rooms) {
+        Map<String, Set<String>> occupiedBeds = new HashMap<>();
+        for (StudentDormRecord student : studentDormService.listAll()) {
+            occupiedBeds.computeIfAbsent(student.getDormNumber().toLowerCase(Locale.ROOT), key -> new HashSet<>())
+                    .add(student.getBedNumber());
+        }
+        Map<String, Set<String>> lockedBeds = new HashMap<>();
+        for (DormChangeRequest request : changeRequestService.listPending()) {
+            lockedBeds.computeIfAbsent(request.getTargetDormNumber().toLowerCase(Locale.ROOT), key -> new HashSet<>())
+                    .add(request.getTargetBedNumber());
+        }
+
         StringBuilder builder = new StringBuilder("[");
         for (int i = 0; i < rooms.size(); i++) {
             DormRoom room = rooms.get(i);
+            String roomKey = room.getDormNumber().toLowerCase(Locale.ROOT);
+            Set<String> occupied = occupiedBeds.getOrDefault(roomKey, Set.of());
+            Set<String> locked = new HashSet<>(lockedBeds.getOrDefault(roomKey, Set.of()));
+            locked.removeAll(occupied);
+            List<String> vacantBedNumbers = room.isActive()
+                    ? infrastructureService.activeBedNumbers(room.getDormNumber()).stream()
+                            .filter(bedNumber -> !occupied.contains(bedNumber) && !locked.contains(bedNumber))
+                            .collect(Collectors.toList())
+                    : List.of();
             if (i > 0) {
                 builder.append(',');
             }
@@ -839,6 +862,10 @@ public class DormitoryWebServer {
                     .append(WebJson.property("roomType", room.getRoomType())).append(',')
                     .append(WebJson.property("genderType", room.getGenderType())).append(',')
                     .append(WebJson.numberProperty("capacity", room.getCapacity())).append(',')
+                    .append(WebJson.numberProperty("occupiedBeds", occupied.size())).append(',')
+                    .append(WebJson.numberProperty("lockedBeds", locked.size())).append(',')
+                    .append(WebJson.numberProperty("vacantBeds", vacantBedNumbers.size())).append(',')
+                    .append("\"vacantBedNumbers\":").append(WebJson.stringArray(vacantBedNumbers)).append(',')
                     .append(WebJson.property("phone", room.getPhone())).append(',')
                     .append(WebJson.property("status", room.getStatus()))
                     .append('}');

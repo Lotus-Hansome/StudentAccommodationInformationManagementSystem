@@ -1,5 +1,6 @@
 package com.dormitory;
 
+import java.util.List;
 import java.util.Map;
 
 public final class WebJson {
@@ -23,6 +24,17 @@ public final class WebJson {
 
     public static String booleanProperty(String name, boolean value) {
         return quote(name) + ":" + value;
+    }
+
+    public static String stringArray(List<String> values) {
+        StringBuilder builder = new StringBuilder("[");
+        for (int i = 0; i < values.size(); i++) {
+            if (i > 0) {
+                builder.append(',');
+            }
+            builder.append(quote(values.get(i)));
+        }
+        return builder.append(']').toString();
     }
 
     public static String departmentCounts(Map<String, Integer> departmentCounts, int totalStudents) {

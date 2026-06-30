@@ -789,6 +789,23 @@ tbody tr:hover {
     background: #f8fbff;
 }
 
+.bed-availability {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    white-space: nowrap;
+}
+
+.bed-availability strong {
+    color: var(--success);
+    font-size: 15px;
+}
+
+.bed-availability span {
+    color: var(--muted);
+    font-size: 13px;
+}
+
 .row-actions {
     display: flex;
     gap: 6px;
